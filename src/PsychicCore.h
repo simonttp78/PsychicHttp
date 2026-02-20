@@ -24,13 +24,13 @@
 #endif
 
 #include "FS.h"
-#include "MD5Builder.h"
 #include "esp_random.h"
 #include <ArduinoJson.h>
 #include <esp_http_server.h>
 #include <libb64/cencode.h>
 #include <list>
 #include <map>
+#include <mbedtls/md5.h>
 
 #ifdef PSY_DEVMODE
   #include "ArduinoTrace.h"
