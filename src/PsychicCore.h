@@ -27,7 +27,6 @@
 #include "MD5Builder.h"
 #include "esp_random.h"
 #include <ArduinoJson.h>
-#include <UrlEncode.h>
 #include <esp_http_server.h>
 #include <libb64/cencode.h>
 #include <list>
@@ -42,6 +41,7 @@ enum HTTPAuthMethod {
   DIGEST_AUTH
 };
 
+String urlEncode(const char* str);
 String urlDecode(const char* encoded);
 
 class PsychicHttpServer;

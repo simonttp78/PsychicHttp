@@ -653,6 +653,23 @@ bool ON_AP_FILTER(PsychicRequest* request)
   return ip_info.ip.addr == (uint32_t)request->client()->localIP();
 }
 
+String urlEncode(const char* str)
+{
+  static const char hex[] = "0123456789ABCDEF";
+  String output;
+  while (*str) {
+    unsigned char c = (unsigned char)*str++;
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+      output += (char)c;
+    else {
+      output += '%';
+      output += hex[c >> 4];
+      output += hex[c & 0xF];
+    }
+  }
+  return output;
+}
+
 String urlDecode(const char* encoded)
 {
   size_t length = strlen(encoded);
