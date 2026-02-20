@@ -402,7 +402,7 @@ void setup()
       output["method"] = request->methodStr();
 
       // work with some params
-      if (input.containsKey("foo")) {
+      if (!input["foo"].isNull()) {
         String foo = input["foo"];
         output["foo"] = foo;
       }
@@ -512,14 +512,16 @@ void setup()
     // how to do basic auth
     //  curl -i --user admin:admin http://psychic.local/auth-basic
     server.on("/auth-basic", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-      return response->send("Auth Basic Success!");
-    })->addMiddleware(&basicAuth);
+            return response->send("Auth Basic Success!");
+          })
+      ->addMiddleware(&basicAuth);
 
     // how to do digest auth
     //  curl -i --user admin:admin http://psychic.local/auth-digest
     server.on("/auth-digest", HTTP_GET, [](PsychicRequest* request, PsychicResponse* response) {
-      return response->send("Auth Digest Success!");
-    })->addMiddleware(&digestAuth);
+            return response->send("Auth Digest Success!");
+          })
+      ->addMiddleware(&digestAuth);
 
     // example of getting / setting cookies
     //  curl -i -b cookie.txt -c cookie.txt http://psychic.local/cookies

@@ -449,16 +449,24 @@ void PsychicRequest::setSessionKey(const String& key, const String& value)
   this->_session->insert(std::pair<String, String>(key, value));
 }
 
-static const String md5str(const String& in)
+static String md5str(const String& in)
 {
-  MD5Builder md5 = MD5Builder();
-  md5.begin();
-  md5.add(in);
-  md5.calculate();
-  return md5.toString();
+  uint8_t digest[16];
+  mbedtls_md5_context ctx;
+  mbedtls_md5_init(&ctx);
+  mbedtls_md5_starts(&ctx);
+  mbedtls_md5_update(&ctx, (const uint8_t*)in.c_str(), in.length());
+  mbedtls_md5_finish(&ctx, digest);
+  mbedtls_md5_free(&ctx);
+
+  char hex[33];
+  for (int i = 0; i < 16; i++)
+    sprintf(hex + i * 2, "%02x", digest[i]);
+  hex[32] = '\0';
+  return String(hex);
 }
 
-bool PsychicRequest::authenticate(const char * username, const char * password, bool passwordIsHashed)
+bool PsychicRequest::authenticate(const char* username, const char* password, bool passwordIsHashed)
 {
   if (hasHeader("Authorization")) {
     String authReq = header("Authorization");
@@ -514,13 +522,12 @@ bool PsychicRequest::authenticate(const char * username, const char * password, 
         _nc = _extractParam(authReq, F("nc="), ',');
         _cnonce = _extractParam(authReq, F("cnonce=\""), '\"');
       }
-      
 
-      String _H1 = passwordIsHashed ? String(password) : md5str(String(username) + ':' + _realm + ':' + String(password));      
-      //ESP_LOGD(PH_TAG, "Hash of user:realm:pass=%s", _H1.c_str());
-      
+      String _H1 = passwordIsHashed ? String(password) : md5str(String(username) + ':' + _realm + ':' + String(password));
+      // ESP_LOGD(PH_TAG, "Hash of user:realm:pass=%s", _H1.c_str());
+
       String _H2 = "";
-      switch(method()) {
+      switch (method()) {
         case HTTP_GET:
           _H2 = md5str(String(F("GET:")) + _uri);
           break;
@@ -538,8 +545,8 @@ bool PsychicRequest::authenticate(const char * username, const char * password, 
           break;
       }
 
-      //ESP_LOGD(PH_TAG, "Hash of GET:uri=%s", _H2.c_str());
-      
+      // ESP_LOGD(PH_TAG, "Hash of GET:uri=%s", _H2.c_str());
+
       String _responsecheck = "";
       if (authReq.indexOf("qop=auth") != -1 || authReq.indexOf("qop=\"auth\"") != -1) {
         _responsecheck = md5str(_H1 + ':' + _nonce + ':' + _nc + ':' + _cnonce + F(":auth:") + _H2);

@@ -53,3 +53,4 @@ examples/websockets/lib/PsychicHttp
 src/cookie.txt
 src/secret.h
 Visual\ Micro
+MIGRATION.md

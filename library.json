@@ -30,12 +30,7 @@
     {
       "owner": "bblanchon",
       "name": "ArduinoJson",
-      "version": "^7.0.4"
-    },
-    {
-      "owner": "plageoj",
-      "name": "UrlEncode",
-      "version": "^1.0.1"
+      "version": "^7.3.0"
     }
   ],
   "export": {
