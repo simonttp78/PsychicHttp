@@ -31,6 +31,7 @@
 #include <list>
 #include <map>
 #include <mbedtls/md5.h>
+#include <string>
 
 #ifdef PSY_DEVMODE
   #include "ArduinoTrace.h"

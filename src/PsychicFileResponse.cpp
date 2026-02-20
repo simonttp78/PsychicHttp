@@ -3,17 +3,22 @@
 #include "PsychicResponse.h"
 #include <http_status.h>
 
+static inline bool endsWith(const char* str, const char* suffix)
+{
+  size_t slen = strlen(str), plen = strlen(suffix);
+  return slen >= plen && strcmp(str + slen - plen, suffix) == 0;
+}
+
 PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, FS& fs, const String& path, const String& contentType, bool download) : PsychicResponseDelegate(response)
 {
-  //_code = 200;
-  String _path(path);
+  std::string _path(path.c_str());
 
-  if (!download && !fs.exists(_path) && fs.exists(_path + ".gz")) {
-    _path = _path + ".gz";
+  if (!download && !fs.exists(_path.c_str()) && fs.exists((_path + ".gz").c_str())) {
+    _path += ".gz";
     addHeader("Content-Encoding", "gzip");
   }
 
-  _content = fs.open(_path, "r");
+  _content = fs.open(_path.c_str(), "r");
   setContentLength(_content.size());
 
   if (contentType == "")
@@ -21,15 +26,13 @@ PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, FS& fs, cons
   else
     setContentType(contentType.c_str());
 
-  int filenameStart = path.lastIndexOf('/') + 1;
-  char buf[26 + path.length() - filenameStart];
-  char* filename = (char*)path.c_str() + filenameStart;
+  const char* lastSlash = strrchr(path.c_str(), '/');
+  const char* filename = lastSlash ? lastSlash + 1 : path.c_str();
+  char buf[26 + strlen(filename) + 1];
 
   if (download) {
-    // set filename and force download
     snprintf(buf, sizeof(buf), "attachment; filename=\"%s\"", filename);
   } else {
-    // set filename and force rendering
     snprintf(buf, sizeof(buf), "inline; filename=\"%s\"", filename);
   }
   addHeader("Content-Disposition", buf);
@@ -37,9 +40,7 @@ PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, FS& fs, cons
 
 PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, File content, const String& path, const String& contentType, bool download) : PsychicResponseDelegate(response)
 {
-  String _path(path);
-
-  if (!download && String(content.name()).endsWith(".gz") && !path.endsWith(".gz")) {
+  if (!download && endsWith(content.name(), ".gz") && !endsWith(path.c_str(), ".gz")) {
     addHeader("Content-Encoding", "gzip");
   }
 
@@ -51,9 +52,9 @@ PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, File content
   else
     setContentType(contentType.c_str());
 
-  int filenameStart = path.lastIndexOf('/') + 1;
-  char buf[26 + path.length() - filenameStart];
-  char* filename = (char*)path.c_str() + filenameStart;
+  const char* lastSlash = strrchr(path.c_str(), '/');
+  const char* filename = lastSlash ? lastSlash + 1 : path.c_str();
+  char buf[26 + strlen(filename) + 1];
 
   if (download) {
     snprintf(buf, sizeof(buf), "attachment; filename=\"%s\"", filename);
@@ -71,43 +72,44 @@ PsychicFileResponse::~PsychicFileResponse()
 
 void PsychicFileResponse::_setContentTypeFromPath(const String& path)
 {
+  const char* p = path.c_str();
   const char* _contentType;
 
-  if (path.endsWith(".html"))
+  if (endsWith(p, ".html"))
     _contentType = "text/html";
-  else if (path.endsWith(".htm"))
+  else if (endsWith(p, ".htm"))
     _contentType = "text/html";
-  else if (path.endsWith(".css"))
+  else if (endsWith(p, ".css"))
     _contentType = "text/css";
-  else if (path.endsWith(".json"))
+  else if (endsWith(p, ".json"))
     _contentType = "application/json";
-  else if (path.endsWith(".js"))
+  else if (endsWith(p, ".js"))
     _contentType = "application/javascript";
-  else if (path.endsWith(".png"))
+  else if (endsWith(p, ".png"))
     _contentType = "image/png";
-  else if (path.endsWith(".gif"))
+  else if (endsWith(p, ".gif"))
     _contentType = "image/gif";
-  else if (path.endsWith(".jpg"))
+  else if (endsWith(p, ".jpg"))
     _contentType = "image/jpeg";
-  else if (path.endsWith(".ico"))
+  else if (endsWith(p, ".ico"))
     _contentType = "image/x-icon";
-  else if (path.endsWith(".svg"))
+  else if (endsWith(p, ".svg"))
     _contentType = "image/svg+xml";
-  else if (path.endsWith(".eot"))
+  else if (endsWith(p, ".eot"))
     _contentType = "font/eot";
-  else if (path.endsWith(".woff"))
+  else if (endsWith(p, ".woff"))
     _contentType = "font/woff";
-  else if (path.endsWith(".woff2"))
+  else if (endsWith(p, ".woff2"))
     _contentType = "font/woff2";
-  else if (path.endsWith(".ttf"))
+  else if (endsWith(p, ".ttf"))
     _contentType = "font/ttf";
-  else if (path.endsWith(".xml"))
+  else if (endsWith(p, ".xml"))
     _contentType = "text/xml";
-  else if (path.endsWith(".pdf"))
+  else if (endsWith(p, ".pdf"))
     _contentType = "application/pdf";
-  else if (path.endsWith(".zip"))
+  else if (endsWith(p, ".zip"))
     _contentType = "application/zip";
-  else if (path.endsWith(".gz"))
+  else if (endsWith(p, ".gz"))
     _contentType = "application/x-gzip";
   else
     _contentType = "text/plain";

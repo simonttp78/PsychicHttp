@@ -37,12 +37,14 @@ void PsychicResponse::setCookie(const char* name, const char* value, unsigned lo
 {
   time_t now = time(nullptr);
 
-  String output;
-  output = urlEncode(name) + "=" + urlEncode(value);
+  std::string output;
+  output = std::string(urlEncode(name).c_str()) + "=" + urlEncode(value).c_str();
 
   // if current time isn't modern, default to using max age
-  if (now < 1700000000)
-    output += "; Max-Age=" + String(secondsFromNow);
+  if (now < 1700000000) {
+    output += "; Max-Age=";
+    output += std::to_string(secondsFromNow);
+  }
   // otherwise, set an expiration date
   else {
     time_t expirationTimestamp = now + secondsFromNow;
@@ -51,12 +53,15 @@ void PsychicResponse::setCookie(const char* name, const char* value, unsigned lo
     struct tm* tmInfo = gmtime(&expirationTimestamp);
     char expires[30];
     strftime(expires, sizeof(expires), "%a, %d %b %Y %H:%M:%S GMT", tmInfo);
-    output += "; Expires=" + String(expires);
+    output += "; Expires=";
+    output += expires;
   }
 
   // did we get any extras?
-  if (strlen(extras))
-    output += "; " + String(extras);
+  if (strlen(extras)) {
+    output += "; ";
+    output += extras;
+  }
 
   // okay, add it in.
   addHeader("Set-Cookie", output.c_str());

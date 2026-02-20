@@ -202,16 +202,14 @@ PsychicEventSourceResponse::PsychicEventSourceResponse(PsychicResponse* response
 
 esp_err_t PsychicEventSourceResponse::send()
 {
-  // build our main header
-  String out = String();
-  out.concat("HTTP/1.1 200 OK\r\n");
+  std::string out = "HTTP/1.1 200 OK\r\n";
 
   // now do our individual headers
   for (auto& header : _response->headers())
-    out.concat(header.field + ": " + header.value + "\r\n");
+    out += std::string(header.field.c_str()) + ": " + header.value.c_str() + "\r\n";
 
   // separator
-  out.concat("\r\n");
+  out += "\r\n";
 
   int result;
   do {
@@ -233,32 +231,32 @@ esp_err_t PsychicEventSourceResponse::send()
 
 String generateEventMessage(const char* message, const char* event, uint32_t id, uint32_t reconnect)
 {
-  String ev = "";
+  std::string ev;
 
   if (reconnect) {
     ev += "retry: ";
-    ev += String(reconnect);
+    ev += std::to_string(reconnect);
     ev += "\r\n";
   }
 
   if (id) {
     ev += "id: ";
-    ev += String(id);
+    ev += std::to_string(id);
     ev += "\r\n";
   }
 
   if (event != NULL) {
     ev += "event: ";
-    ev += String(event);
+    ev += event;
     ev += "\r\n";
   }
 
   if (message != NULL) {
     ev += "data: ";
-    ev += String(message);
+    ev += message;
     ev += "\r\n";
   }
   ev += "\r\n";
 
-  return ev;
+  return ev.c_str();
 }
