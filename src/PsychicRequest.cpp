@@ -2,6 +2,7 @@
 #include "MultipartProcessor.h"
 #include "PsychicHttpServer.h"
 #include "http_status.h"
+#include <mbedtls/version.h>
 
 PsychicRequest::PsychicRequest(PsychicHttpServer* server, httpd_req_t* req) : _server(server),
                                                                               _req(req),
@@ -453,9 +454,15 @@ static std::string md5str(const std::string& in)
   uint8_t digest[16];
   mbedtls_md5_context ctx;
   mbedtls_md5_init(&ctx);
+#if MBEDTLS_VERSION_MAJOR >= 3
   mbedtls_md5_starts(&ctx);
   mbedtls_md5_update(&ctx, (const uint8_t*)in.c_str(), in.length());
   mbedtls_md5_finish(&ctx, digest);
+#else
+  mbedtls_md5_starts_ret(&ctx);
+  mbedtls_md5_update_ret(&ctx, (const uint8_t*)in.c_str(), in.length());
+  mbedtls_md5_finish_ret(&ctx, digest);
+#endif
   mbedtls_md5_free(&ctx);
 
   char hex[33];
