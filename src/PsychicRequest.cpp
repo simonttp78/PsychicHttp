@@ -373,18 +373,17 @@ void PsychicRequest::_setUri(const char* uri)
 
 void PsychicRequest::_addParams(const String& params, bool post)
 {
-  size_t start = 0;
-  while (start < params.length()) {
-    int end = params.indexOf('&', start);
-    if (end < 0)
-      end = params.length();
-    int equal = params.indexOf('=', start);
-    if (equal < 0 || equal > end)
-      equal = end;
-    String name = params.substring(start, equal);
-    String value = equal + 1 < end ? params.substring(equal + 1, end) : String();
-    addParam(name, value, true, post);
-    start = end + 1;
+  const char* p = params.c_str();
+  const char* pend = p + params.length();
+  while (p < pend) {
+    const char* amp = (const char*)memchr(p, '&', pend - p);
+    if (amp == nullptr)
+      amp = pend;
+    const char* eq = (const char*)memchr(p, '=', amp - p);
+    if (eq == nullptr)
+      eq = amp;
+    addParam(String(p, eq - p), eq < amp ? String(eq + 1, amp - eq - 1) : String(), true, post);
+    p = amp + 1;
   }
 }
 
@@ -449,7 +448,7 @@ void PsychicRequest::setSessionKey(const String& key, const String& value)
   this->_session->insert(std::pair<String, String>(key, value));
 }
 
-static String md5str(const String& in)
+static std::string md5str(const std::string& in)
 {
   uint8_t digest[16];
   mbedtls_md5_context ctx;
@@ -463,114 +462,126 @@ static String md5str(const String& in)
   for (int i = 0; i < 16; i++)
     sprintf(hex + i * 2, "%02x", digest[i]);
   hex[32] = '\0';
-  return String(hex);
+  return std::string(hex);
 }
 
 bool PsychicRequest::authenticate(const char* username, const char* password, bool passwordIsHashed)
 {
   if (hasHeader("Authorization")) {
-    String authReq = header("Authorization");
-    if (authReq.startsWith("Basic")) {
-      authReq = authReq.substring(6);
-      authReq.trim();
+    std::string authReq = header("Authorization").c_str();
+    if (authReq.compare(0, 5, "Basic") == 0) {
+      authReq = authReq.substr(6);
+      authReq.erase(0, authReq.find_first_not_of(" \t\r\n\f\v"));
+      authReq.erase(authReq.find_last_not_of(" \t\r\n\f\v") + 1);
       char toencodeLen = strlen(username) + strlen(password) + 1;
       char* toencode = new char[toencodeLen + 1];
       if (toencode == NULL) {
-        authReq = "";
+        authReq.clear();
         return false;
       }
       char* encoded = new char[base64_encode_expected_len(toencodeLen) + 1];
       if (encoded == NULL) {
-        authReq = "";
+        authReq.clear();
         delete[] toencode;
         return false;
       }
       sprintf(toencode, "%s:%s", username, password);
-      if (base64_encode_chars(toencode, toencodeLen, encoded) > 0 && authReq.equalsConstantTime(encoded)) {
-        authReq = "";
-        delete[] toencode;
-        delete[] encoded;
-        return true;
+      if (base64_encode_chars(toencode, toencodeLen, encoded) > 0) {
+        // constant-time comparison to prevent timing attacks
+        uint8_t ct_result = (authReq.size() != strlen(encoded));
+        for (size_t i = 0; i < authReq.size() && i < strlen(encoded); i++)
+          ct_result |= (uint8_t)authReq[i] ^ (uint8_t)encoded[i];
+        if (ct_result == 0) {
+          authReq.clear();
+          delete[] toencode;
+          delete[] encoded;
+          return true;
+        }
       }
       delete[] toencode;
       delete[] encoded;
-    } else if (authReq.startsWith(F("Digest"))) {
-      authReq = authReq.substring(7);
-      String _username = _extractParam(authReq, F("username=\""), '\"');
-      if (!_username.length() || _username != String(username)) {
-        authReq = "";
+    } else if (authReq.compare(0, 6, "Digest") == 0) {
+      authReq = authReq.substr(7);
+      std::string _username = _extractParam(authReq.c_str(), "username=\"", '\"').c_str();
+      if (_username.empty() || _username != username) {
+        authReq.clear();
         return false;
       }
       // extracting required parameters for RFC 2069 simpler Digest
-      String _realm = _extractParam(authReq, F("realm=\""), '\"');
-      String _nonce = _extractParam(authReq, F("nonce=\""), '\"');
-      String _url = _extractParam(authReq, F("uri=\""), '\"');
-      String _resp = _extractParam(authReq, F("response=\""), '\"');
-      String _opaque = _extractParam(authReq, F("opaque=\""), '\"');
+      std::string _realm = _extractParam(authReq.c_str(), "realm=\"", '\"').c_str();
+      std::string _nonce = _extractParam(authReq.c_str(), "nonce=\"", '\"').c_str();
+      std::string _url = _extractParam(authReq.c_str(), "uri=\"", '\"').c_str();
+      std::string _resp = _extractParam(authReq.c_str(), "response=\"", '\"').c_str();
+      std::string _opaque = _extractParam(authReq.c_str(), "opaque=\"", '\"').c_str();
 
-      if ((!_realm.length()) || (!_nonce.length()) || (!_url.length()) || (!_resp.length()) || (!_opaque.length())) {
-        authReq = "";
+      if (_realm.empty() || _nonce.empty() || _url.empty() || _resp.empty() || _opaque.empty()) {
+        authReq.clear();
         return false;
       }
-      if ((_opaque != this->getSessionKey("opaque")) || (_nonce != this->getSessionKey("nonce")) || (_realm != this->getSessionKey("realm"))) {
-        authReq = "";
+      if ((_opaque != this->getSessionKey("opaque").c_str()) || (_nonce != this->getSessionKey("nonce").c_str()) || (_realm != this->getSessionKey("realm").c_str())) {
+        authReq.clear();
         return false;
       }
       // parameters for the RFC 2617 newer Digest
-      String _nc, _cnonce;
-      if (authReq.indexOf("qop=auth") != -1 || authReq.indexOf("qop=\"auth\"") != -1) {
-        _nc = _extractParam(authReq, F("nc="), ',');
-        _cnonce = _extractParam(authReq, F("cnonce=\""), '\"');
+      std::string _nc, _cnonce;
+      if (authReq.find("qop=auth") != std::string::npos || authReq.find("qop=\"auth\"") != std::string::npos) {
+        _nc = _extractParam(authReq.c_str(), "nc=", ',').c_str();
+        _cnonce = _extractParam(authReq.c_str(), "cnonce=\"", '\"').c_str();
       }
 
-      String _H1 = passwordIsHashed ? String(password) : md5str(String(username) + ':' + _realm + ':' + String(password));
+      std::string _H1 = passwordIsHashed ? std::string(password) : md5str(std::string(username) + ':' + _realm + ':' + password);
       // ESP_LOGD(PH_TAG, "Hash of user:realm:pass=%s", _H1.c_str());
 
-      String _H2 = "";
+      std::string _H2;
       switch (method()) {
         case HTTP_GET:
-          _H2 = md5str(String(F("GET:")) + _uri);
+          _H2 = md5str(std::string("GET:") + _uri.c_str());
           break;
         case HTTP_POST:
-          _H2 = md5str(String(F("POST:")) + _uri);
+          _H2 = md5str(std::string("POST:") + _uri.c_str());
           break;
         case HTTP_PUT:
-          _H2 = md5str(String(F("PUT:")) + _uri);
+          _H2 = md5str(std::string("PUT:") + _uri.c_str());
           break;
         case HTTP_DELETE:
-          _H2 = md5str(String(F("DELETE:")) + _uri);
+          _H2 = md5str(std::string("DELETE:") + _uri.c_str());
           break;
         default:
-          _H2 = md5str(String(F("GET:")) + _uri);
+          _H2 = md5str(std::string("GET:") + _uri.c_str());
           break;
       }
 
       // ESP_LOGD(PH_TAG, "Hash of GET:uri=%s", _H2.c_str());
 
-      String _responsecheck = "";
-      if (authReq.indexOf("qop=auth") != -1 || authReq.indexOf("qop=\"auth\"") != -1) {
-        _responsecheck = md5str(_H1 + ':' + _nonce + ':' + _nc + ':' + _cnonce + F(":auth:") + _H2);
+      std::string _responsecheck;
+      if (authReq.find("qop=auth") != std::string::npos || authReq.find("qop=\"auth\"") != std::string::npos) {
+        _responsecheck = md5str(_H1 + ':' + _nonce + ':' + _nc + ':' + _cnonce + ":auth:" + _H2);
       } else {
         _responsecheck = md5str(_H1 + ':' + _nonce + ':' + _H2);
       }
 
       // ESP_LOGD(PH_TAG, "The Proper response=%s", _responsecheck.c_str());
       if (_resp == _responsecheck) {
-        authReq = "";
+        authReq.clear();
         return true;
       }
     }
-    authReq = "";
+    authReq.clear();
   }
   return false;
 }
 
 const String PsychicRequest::_extractParam(const String& authReq, const String& param, const char delimit)
 {
-  int _begin = authReq.indexOf(param);
-  if (_begin == -1)
+  std::string req(authReq.c_str());
+  std::string par(param.c_str());
+  size_t _begin = req.find(par);
+  if (_begin == std::string::npos)
     return "";
-  return authReq.substring(_begin + param.length(), authReq.indexOf(delimit, _begin + param.length()));
+  size_t _delim = req.find(delimit, _begin + par.length());
+  if (_delim == std::string::npos)
+    return req.substr(_begin + par.length()).c_str();
+  return req.substr(_begin + par.length(), _delim - _begin - par.length()).c_str();
 }
 
 const String PsychicRequest::_getRandomHexString()
