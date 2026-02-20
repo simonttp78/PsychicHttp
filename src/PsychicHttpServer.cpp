@@ -5,7 +5,7 @@
 #include "PsychicStaticFileHandler.h"
 #include "PsychicWebHandler.h"
 #include "PsychicWebSocket.h"
-#include "WiFi.h"
+#include "esp_netif.h"
 #ifdef PSY_ENABLE_ETHERNET
   #include "ETH.h"
 #endif
@@ -84,9 +84,12 @@ uint16_t PsychicHttpServer::getPort()
 
 bool PsychicHttpServer::isConnected()
 {
-  if (WiFi.softAPIP())
+  esp_netif_ip_info_t ip_info;
+  esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+  if (ap_netif && esp_netif_get_ip_info(ap_netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0)
     return true;
-  if (WiFi.localIP())
+  esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (sta_netif && esp_netif_get_ip_info(sta_netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0)
     return true;
 
 #ifdef PSY_ENABLE_ETHERNET
@@ -630,12 +633,24 @@ const std::list<PsychicClient*>& PsychicHttpServer::getClientList()
 
 bool ON_STA_FILTER(PsychicRequest* request)
 {
-  return WiFi.localIP() == request->client()->localIP();
+  esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (!sta_netif)
+    return false;
+  esp_netif_ip_info_t ip_info;
+  if (esp_netif_get_ip_info(sta_netif, &ip_info) != ESP_OK)
+    return false;
+  return ip_info.ip.addr == (uint32_t)request->client()->localIP();
 }
 
 bool ON_AP_FILTER(PsychicRequest* request)
 {
-  return WiFi.softAPIP() == request->client()->localIP();
+  esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+  if (!ap_netif)
+    return false;
+  esp_netif_ip_info_t ip_info;
+  if (esp_netif_get_ip_info(ap_netif, &ip_info) != ESP_OK)
+    return false;
+  return ip_info.ip.addr == (uint32_t)request->client()->localIP();
 }
 
 String urlDecode(const char* encoded)
