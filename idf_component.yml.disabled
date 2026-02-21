@@ -13,11 +13,7 @@ tags:
 
 dependencies:
   bblanchon/arduinojson: ^7.3.0
-  espressif/arduino-esp32:
-    matches:
-      - if: "idf_version ^4"
-        version: "^2"
-      - if: "idf_version ^5.1"
-        version: "^3.0"
-      - if: "idf_version ^5.4"
-        version: "3.2.0"
+  # espressif/arduino-esp32 intentionally omitted — pure ESP-IDF builds must not
+  # pull in the Arduino framework.  If you need Arduino support, add the
+  # arduino component via EXTRA_COMPONENT_DIRS in your project CMakeLists.txt
+  # instead of re-enabling it here.
