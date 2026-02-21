@@ -177,12 +177,12 @@ esp_err_t PsychicStaticFileHandler::handleRequest(PsychicRequest* request, Psych
   if (_file) {
     // is it not modified?
     std::string etag = std::to_string(_file.size());
-    if (_last_modified.length() && _last_modified == request->header("If-Modified-Since")) {
+    if (_last_modified.length() && _last_modified == request->headerCStr("If-Modified-Since")) {
       _file.close();
       res->send(304); // Not modified
     }
     // does our Etag match?
-    else if (_cache_control.length() && request->hasHeader("If-None-Match") && etag == request->header("If-None-Match")) {
+    else if (_cache_control.length() && request->hasHeader("If-None-Match") && etag == request->headerCStr("If-None-Match")) {
       _file.close();
 
       res->addHeader("Cache-Control", _cache_control.c_str());

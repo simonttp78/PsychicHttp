@@ -42,7 +42,7 @@ esp_err_t MultipartProcessor::process()
 
   _parsedLength = 0;
 
-  const char* value = _request->header("Content-Type");
+  const char* value = _request->headerCStr("Content-Type");
   if (value && strncmp(value, "multipart/", 10) == 0) {
     const char* eq = strchr(value, '=');
     _boundary = (eq ? eq + 1 : "");
@@ -102,7 +102,7 @@ esp_err_t MultipartProcessor::process(const char* body)
   esp_err_t err = ESP_OK;
   _parsedLength = 0;
 
-  const char* value = _request->header("Content-Type");
+  const char* value = _request->headerCStr("Content-Type");
   if (value && strncmp(value, "multipart/", 10) == 0) {
     const char* eq = strchr(value, '=');
     _boundary = (eq ? eq + 1 : "");

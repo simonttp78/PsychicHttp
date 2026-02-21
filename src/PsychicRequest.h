@@ -63,6 +63,11 @@ class PsychicRequest
     std::string _extractParam(const char* authReq, const char* param, const char delimit);
     std::string _getRandomHexString();
 
+    // Internal helper: always returns const char* backed by _tmp. Used by the
+    // public header() overloads and by internal library code that needs a raw
+    // pointer regardless of platform.
+    const char* _getHeader(const char* name);
+
   public:
     PsychicRequest(PsychicHttpServer* server, httpd_req_t* req);
     virtual ~PsychicRequest();
@@ -83,7 +88,14 @@ class PsychicRequest
     bool isMultipart();
     esp_err_t loadBody();
 
+#ifdef ARDUINO
+    String header(const char* name);
+#else
     const char* header(const char* name);
+#endif
+    // Always returns const char* regardless of platform — use this in library
+    // internals (MultipartProcessor, EventSource, etc.) that need a raw pointer.
+    const char* headerCStr(const char* name);
     bool hasHeader(const char* name);
 
     static void freeSession(void* ctx);
@@ -123,15 +135,20 @@ class PsychicRequest
     // convenience / lazy function for getting cookies.
     const char* getCookie(const char* key);
 
-    http_method method();      // returns the HTTP method used as enum value (eg. HTTP_GET)
-    const char* methodStr();   // returns the HTTP method used as a string (eg. "GET")
-    const char* path();        // returns the request path (eg /page?foo=bar returns "/page")
-    const char* uri();         // returns the full request uri (eg /page?foo=bar)
-    const char* query();       // returns the request query data (eg /page?foo=bar returns "foo=bar")
+    http_method method();    // returns the HTTP method used as enum value (eg. HTTP_GET)
+    const char* methodStr(); // returns the HTTP method used as a string (eg. "GET")
+    const char* path();      // returns the request path (eg /page?foo=bar returns "/page")
+    const char* uri();       // returns the full request uri (eg /page?foo=bar)
+    const char* query();     // returns the request query data (eg /page?foo=bar returns "foo=bar")
+#ifdef ARDUINO
+    String host();        // returns the requested host (request to http://psychic.local/foo will return "psychic.local")
+    String contentType(); // returns the Content-Type header value
+#else
     const char* host();        // returns the requested host (request to http://psychic.local/foo will return "psychic.local")
     const char* contentType(); // returns the Content-Type header value
-    size_t contentLength();    // returns the Content-Length header value
-    const char* body();        // returns the body of the request
+#endif
+    size_t contentLength(); // returns the Content-Length header value
+    const char* body();     // returns the body of the request
     const ContentDisposition getContentDisposition();
     const char* version() { return "HTTP/1.1"; }
 

@@ -127,7 +127,7 @@ const char* PsychicRequest::getFilename()
 const ContentDisposition PsychicRequest::getContentDisposition()
 {
   ContentDisposition cd;
-  std::string hdr(this->header("Content-Disposition"));
+  std::string hdr(this->_getHeader("Content-Disposition"));
   size_t start, end;
 
   if (hdr.compare(0, 9, "form-data") == 0)
@@ -237,7 +237,7 @@ const char* PsychicRequest::query()
 // {
 // }
 
-const char* PsychicRequest::header(const char* name)
+const char* PsychicRequest::_getHeader(const char* name)
 {
   size_t header_len = httpd_req_get_hdr_value_len(this->_req, name);
 
@@ -252,20 +252,49 @@ const char* PsychicRequest::header(const char* name)
   return _tmp.c_str();
 }
 
+#ifdef ARDUINO
+String PsychicRequest::header(const char* name)
+{
+  return String(_getHeader(name));
+}
+#else
+const char* PsychicRequest::header(const char* name)
+{
+  return _getHeader(name);
+}
+#endif
+
+const char* PsychicRequest::headerCStr(const char* name)
+{
+  return _getHeader(name);
+}
+
 bool PsychicRequest::hasHeader(const char* name)
 {
   return httpd_req_get_hdr_value_len(this->_req, name) > 0;
 }
 
+#ifdef ARDUINO
+String PsychicRequest::host()
+{
+  return String(_getHeader("Host"));
+}
+
+String PsychicRequest::contentType()
+{
+  return String(_getHeader("Content-Type"));
+}
+#else
 const char* PsychicRequest::host()
 {
-  return this->header("Host");
+  return _getHeader("Host");
 }
 
 const char* PsychicRequest::contentType()
 {
-  return header("Content-Type");
+  return _getHeader("Content-Type");
 }
+#endif
 
 size_t PsychicRequest::contentLength()
 {
@@ -279,7 +308,7 @@ const char* PsychicRequest::body()
 
 bool PsychicRequest::isMultipart()
 {
-  return strstr(this->contentType(), "multipart/form-data") != nullptr;
+  return strstr(this->_getHeader("Content-Type"), "multipart/form-data") != nullptr;
 }
 
 bool PsychicRequest::hasCookie(const char* key, size_t* size)
@@ -348,7 +377,7 @@ void PsychicRequest::loadParams()
 
   // various form data as parameters
   if (this->method() == HTTP_POST) {
-    if (strncmp(this->contentType(), "application/x-www-form-urlencoded", 33) == 0)
+    if (strncmp(this->_getHeader("Content-Type"), "application/x-www-form-urlencoded", 33) == 0)
       _addParams(_body.c_str(), true);
 
     if (this->isMultipart()) {
@@ -489,7 +518,7 @@ static std::string md5str(const std::string& in)
 bool PsychicRequest::authenticate(const char* username, const char* password, bool passwordIsHashed)
 {
   if (hasHeader("Authorization")) {
-    std::string authReq = header("Authorization");
+    std::string authReq = _getHeader("Authorization");
     if (authReq.compare(0, 5, "Basic") == 0) {
       authReq = authReq.substr(6);
       authReq.erase(0, authReq.find_first_not_of(" \t\r\n\f\v"));
