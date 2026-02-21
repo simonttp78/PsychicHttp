@@ -24,6 +24,7 @@ else()
     set(COMPONENT_REQUIRES
         "esp_https_server"
         "esp_http_server"
+        "esp_netif"
         "mbedtls"
         "arduinojson"
     )
