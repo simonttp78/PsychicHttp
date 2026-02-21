@@ -633,7 +633,10 @@ const std::list<PsychicClient*>& PsychicHttpServer::getClientList()
 
 bool ON_STA_FILTER(PsychicRequest* request)
 {
-  esp_netif_t* sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  // cache the handle: it's stable for the lifetime of the netif after WiFi is up
+  static esp_netif_t* sta_netif = nullptr;
+  if (!sta_netif)
+    sta_netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
   if (!sta_netif)
     return false;
   esp_netif_ip_info_t ip_info;
@@ -644,7 +647,10 @@ bool ON_STA_FILTER(PsychicRequest* request)
 
 bool ON_AP_FILTER(PsychicRequest* request)
 {
-  esp_netif_t* ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+  // cache the handle: it's stable for the lifetime of the netif after WiFi is up
+  static esp_netif_t* ap_netif = nullptr;
+  if (!ap_netif)
+    ap_netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
   if (!ap_netif)
     return false;
   esp_netif_ip_info_t ip_info;
@@ -657,6 +663,7 @@ String urlEncode(const char* str)
 {
   static const char hex[] = "0123456789ABCDEF";
   String output;
+  output.reserve(strlen(str)); // reserve memory to avoid reallocations for short inputs
   while (*str) {
     unsigned char c = (unsigned char)*str++;
     if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
@@ -672,35 +679,29 @@ String urlEncode(const char* str)
 
 String urlDecode(const char* encoded)
 {
-  size_t length = strlen(encoded);
-  char* decoded = (char*)malloc(length + 1);
-  if (!decoded) {
-    return "";
-  }
+  // inline hex nibble decode is ~10x faster than sscanf("%2x")
+  auto hexVal = [](char c) -> unsigned char {
+    if (c >= '0' && c <= '9')
+      return c - '0';
+    if (c >= 'a' && c <= 'f')
+      return c - 'a' + 10;
+    return c - 'A' + 10; // 'A'..'F'
+  };
 
-  size_t i, j = 0;
-  for (i = 0; i < length; ++i) {
+  size_t length = strlen(encoded);
+  std::string output;
+  output.reserve(length); // decoded is always <= encoded length
+  for (size_t i = 0; i < length; ++i) {
     if (encoded[i] == '%' && isxdigit(encoded[i + 1]) && isxdigit(encoded[i + 2])) {
-      // Valid percent-encoded sequence
-      int hex;
-      sscanf(encoded + i + 1, "%2x", &hex);
-      decoded[j++] = (char)hex;
-      i += 2; // Skip the two hexadecimal characters
+      output += (char)((hexVal(encoded[i + 1]) << 4) | hexVal(encoded[i + 2]));
+      i += 2;
     } else if (encoded[i] == '+') {
-      // Convert '+' to space
-      decoded[j++] = ' ';
+      output += ' ';
     } else {
-      // Copy other characters as they are
-      decoded[j++] = encoded[i];
+      output += encoded[i];
     }
   }
-
-  decoded[j] = '\0'; // Null-terminate the decoded string
-
-  String output(decoded);
-  free(decoded);
-
-  return output;
+  return output.c_str();
 }
 
 bool psychic_uri_match_simple(const char* uri1, const char* uri2, size_t len2)

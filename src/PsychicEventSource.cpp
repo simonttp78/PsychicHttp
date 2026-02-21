@@ -205,8 +205,12 @@ esp_err_t PsychicEventSourceResponse::send()
   std::string out = "HTTP/1.1 200 OK\r\n";
 
   // now do our individual headers
-  for (auto& header : _response->headers())
-    out += std::string(header.field.c_str()) + ": " + header.value.c_str() + "\r\n";
+  for (auto& header : _response->headers()) {
+    out += header.field.c_str();
+    out += ": ";
+    out += header.value.c_str();
+    out += "\r\n";
+  }
 
   // separator
   out += "\r\n";

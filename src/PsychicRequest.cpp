@@ -272,9 +272,7 @@ const String& PsychicRequest::body()
 
 bool PsychicRequest::isMultipart()
 {
-  const String& type = this->contentType();
-
-  return (this->contentType().indexOf("multipart/form-data") >= 0);
+  return this->contentType().indexOf("multipart/form-data") >= 0;
 }
 
 bool PsychicRequest::hasCookie(const char* key, size_t* size)
@@ -465,11 +463,14 @@ static std::string md5str(const std::string& in)
 #endif
   mbedtls_md5_free(&ctx);
 
+  static const char hexchars[] = "0123456789abcdef";
   char hex[33];
-  for (int i = 0; i < 16; i++)
-    sprintf(hex + i * 2, "%02x", digest[i]);
+  for (int i = 0; i < 16; i++) {
+    hex[i * 2] = hexchars[digest[i] >> 4];
+    hex[i * 2 + 1] = hexchars[digest[i] & 0x0F];
+  }
   hex[32] = '\0';
-  return std::string(hex);
+  return std::string(hex, 32);
 }
 
 bool PsychicRequest::authenticate(const char* username, const char* password, bool passwordIsHashed)
@@ -530,8 +531,10 @@ bool PsychicRequest::authenticate(const char* username, const char* password, bo
         return false;
       }
       // parameters for the RFC 2617 newer Digest
+      // cache qop flag: avoids scanning the header string four times
+      const bool _hasQop = authReq.find("qop=auth") != std::string::npos || authReq.find("qop=\"auth\"") != std::string::npos;
       std::string _nc, _cnonce;
-      if (authReq.find("qop=auth") != std::string::npos || authReq.find("qop=\"auth\"") != std::string::npos) {
+      if (_hasQop) {
         _nc = _extractParam(authReq.c_str(), "nc=", ',').c_str();
         _cnonce = _extractParam(authReq.c_str(), "cnonce=\"", '\"').c_str();
       }
@@ -561,7 +564,7 @@ bool PsychicRequest::authenticate(const char* username, const char* password, bo
       // ESP_LOGD(PH_TAG, "Hash of GET:uri=%s", _H2.c_str());
 
       std::string _responsecheck;
-      if (authReq.find("qop=auth") != std::string::npos || authReq.find("qop=\"auth\"") != std::string::npos) {
+      if (_hasQop) {
         _responsecheck = md5str(_H1 + ':' + _nonce + ':' + _nc + ':' + _cnonce + ":auth:" + _H2);
       } else {
         _responsecheck = md5str(_H1 + ':' + _nonce + ':' + _H2);
