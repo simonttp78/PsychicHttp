@@ -199,7 +199,7 @@ void setup()
       //work with some params
       if (request->hasParam("foo"))
       {
-        String foo = request->getParam("foo")->value();
+        String foo = request->getParam("foo", "");
         output["foo"] = foo;
       }
 

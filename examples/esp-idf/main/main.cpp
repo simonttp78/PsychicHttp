@@ -154,8 +154,7 @@ void setup()
     }
     MDNS.addService("http", "tcp", 80);
 
-    if(!LittleFS.begin(false, "/spiffs", 5, "littlefs"))
-    {
+    if (!LittleFS.begin(false, "/spiffs", 5, "littlefs")) {
       Serial.println("LittleFS Mount Failed. Do Platform -> Build Filesystem Image and Platform -> Upload Filesystem Image from VSCode");
       return;
     }
@@ -292,7 +291,7 @@ void setup()
       //work with some params
       if (request->hasParam("foo"))
       {
-        String foo = request->getParam("foo")->name();
+        String foo = request->getParam("foo", "");
         output["foo"] = foo;
       }
 
@@ -330,8 +329,8 @@ void setup()
     // example of getting POST variables
     server.on("/post", HTTP_POST, [](PsychicRequest* request, PsychicResponse* response) {
       String output;
-      output += "Param 1: " + request->getParam("param1")->value() + "<br/>\n";
-      output += "Param 2: " + request->getParam("param2")->value() + "<br/>\n";
+      output += "Param 1: " + String(request->getParam("param1", "")) + "<br/>\n";
+      output += "Param 2: " + String(request->getParam("param2", "")) + "<br/>\n";
 
       return response->send(output.c_str()); });
 
@@ -354,7 +353,7 @@ void setup()
         file = LittleFS.open(path, FILE_WRITE);
       else
         file = LittleFS.open(path, FILE_APPEND);
-      
+
       if(!file) {
         Serial.println("Failed to open file");
         return ESP_FAIL;
@@ -393,7 +392,7 @@ void setup()
         file = LittleFS.open(path, FILE_WRITE);
       else
         file = LittleFS.open(path, FILE_APPEND);
-      
+
       if(!file) {
         Serial.println("Failed to open file");
         return ESP_FAIL;
@@ -415,9 +414,9 @@ void setup()
 
       output += "<a href=\"" + url + "\">" + url + "</a><br/>\n";
       output += "Bytes: " + String(file->size()) + "<br/>\n";
-      output += "Param 1: " + request->getParam("param1")->value() + "<br/>\n";
-      output += "Param 2: " + request->getParam("param2")->value() + "<br/>\n";
-      
+      output += "Param 1: " + String(request->getParam("param1", "")) + "<br/>\n";
+      output += "Param 2: " + String(request->getParam("param2", "")) + "<br/>\n";
+
       return response->send(output.c_str()); });
 
     // wildcard basic file upload - POST to /upload/filename.ext

@@ -151,7 +151,7 @@ esp_err_t PsychicResponse::finishChunking()
 
 esp_err_t PsychicResponse::redirect(const char* url)
 {
-  if (!_code)
+  if (_code == 200)
     setCode(301);
   addHeader("Location", url);
   return send();
