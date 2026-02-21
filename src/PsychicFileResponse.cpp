@@ -9,60 +9,80 @@ static inline bool endsWith(const char* str, const char* suffix)
   return slen >= plen && strcmp(str + slen - plen, suffix) == 0;
 }
 
-PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, FS& fs, const String& path, const String& contentType, bool download) : PsychicResponseDelegate(response)
+// Shared implementation called by all path-based constructors.
+void PsychicFileResponse::_initFromFS(psychic::FS fs, const char* path, const char* contentType, bool download)
 {
-  std::string _path(path.c_str());
+  std::string spath(path);
 
-  if (!download && !fs.exists(_path.c_str()) && fs.exists((_path + ".gz").c_str())) {
-    _path += ".gz";
+  if (!download && !fs.exists(spath.c_str()) && fs.exists((spath + ".gz").c_str())) {
+    spath += ".gz";
     addHeader("Content-Encoding", "gzip");
   }
 
-  _content = fs.open(_path.c_str(), "r");
+  _content = fs.open(spath.c_str(), "r");
   setContentLength(_content.size());
 
-  if (contentType == "")
+  if (!contentType || !*contentType)
     _setContentTypeFromPath(path);
+  else
+    setContentType(contentType);
+
+  const char* lastSlash = strrchr(path, '/');
+  const char* filename = lastSlash ? lastSlash + 1 : path;
+  std::string disposition = download ? "attachment" : "inline";
+  disposition += "; filename=\"";
+  disposition += filename;
+  disposition += "\"";
+  addHeader("Content-Disposition", disposition.c_str());
+}
+
+// PUBLIC API for IDF
+// Open a file by its full VFS path (e.g. "/littlefs/index.html").
+PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, const char* path, const char* contentType, bool download)
+    : PsychicResponseDelegate(response)
+{
+  _initFromFS(psychic::FS{}, path, contentType, download);
+}
+
+// INTERNAL used by PsychicStaticFileHandler (Arduino and IDF)
+PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, psychic::FS fs, const char* path, const char* contentType, bool download)
+    : PsychicResponseDelegate(response)
+{
+  _initFromFS(fs, path, contentType, download);
+}
+
+#ifdef ARDUINO
+// PUBLIC API for Arduino - replaces old ctor(FS&, String).
+PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, fs::FS& fs, const String& path, const String& contentType, bool download)
+    : PsychicResponseDelegate(response)
+{
+  _initFromFS(psychic::FS(fs), path.c_str(), contentType.length() ? contentType.c_str() : nullptr, download);
+}
+
+// PUBLIC API for Arduino - replaces old ctor(File, String).
+PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, fs::File content, const String& path, const String& contentType, bool download)
+    : PsychicResponseDelegate(response)
+{
+  if (!download && endsWith(content.name(), ".gz") && !endsWith(path.c_str(), ".gz"))
+    addHeader("Content-Encoding", "gzip");
+
+  _content = psychic::File(content);
+  setContentLength(_content.size());
+
+  if (contentType.length() == 0)
+    _setContentTypeFromPath(path.c_str());
   else
     setContentType(contentType.c_str());
 
   const char* lastSlash = strrchr(path.c_str(), '/');
   const char* filename = lastSlash ? lastSlash + 1 : path.c_str();
-  char buf[26 + strlen(filename) + 1];
-
-  if (download) {
-    snprintf(buf, sizeof(buf), "attachment; filename=\"%s\"", filename);
-  } else {
-    snprintf(buf, sizeof(buf), "inline; filename=\"%s\"", filename);
-  }
-  addHeader("Content-Disposition", buf);
+  std::string disposition = download ? "attachment" : "inline";
+  disposition += "; filename=\"";
+  disposition += filename;
+  disposition += "\"";
+  addHeader("Content-Disposition", disposition.c_str());
 }
-
-PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, File content, const String& path, const String& contentType, bool download) : PsychicResponseDelegate(response)
-{
-  if (!download && endsWith(content.name(), ".gz") && !endsWith(path.c_str(), ".gz")) {
-    addHeader("Content-Encoding", "gzip");
-  }
-
-  _content = content;
-  setContentLength(_content.size());
-
-  if (contentType == "")
-    _setContentTypeFromPath(path);
-  else
-    setContentType(contentType.c_str());
-
-  const char* lastSlash = strrchr(path.c_str(), '/');
-  const char* filename = lastSlash ? lastSlash + 1 : path.c_str();
-  char buf[26 + strlen(filename) + 1];
-
-  if (download) {
-    snprintf(buf, sizeof(buf), "attachment; filename=\"%s\"", filename);
-  } else {
-    snprintf(buf, sizeof(buf), "inline; filename=\"%s\"", filename);
-  }
-  addHeader("Content-Disposition", buf);
-}
+#endif
 
 PsychicFileResponse::~PsychicFileResponse()
 {
@@ -70,9 +90,8 @@ PsychicFileResponse::~PsychicFileResponse()
     _content.close();
 }
 
-void PsychicFileResponse::_setContentTypeFromPath(const String& path)
+void PsychicFileResponse::_setContentTypeFromPath(const char* p)
 {
-  const char* p = path.c_str();
   const char* _contentType;
 
   if (endsWith(p, ".html"))

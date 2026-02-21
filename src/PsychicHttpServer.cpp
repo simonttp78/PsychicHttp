@@ -591,9 +591,19 @@ void PsychicHttpServer::closeCallback(httpd_handle_t hd, int sockfd)
   close(sockfd);
 }
 
+#ifdef ARDUINO
 PsychicStaticFileHandler* PsychicHttpServer::serveStatic(const char* uri, fs::FS& fs, const char* path, const char* cache_control)
 {
   PsychicStaticFileHandler* handler = new PsychicStaticFileHandler(uri, fs, path, cache_control);
+  this->addHandler(handler);
+
+  return handler;
+}
+#endif
+
+PsychicStaticFileHandler* PsychicHttpServer::serveStatic(const char* uri, const char* path, const char* cache_control)
+{
+  PsychicStaticFileHandler* handler = new PsychicStaticFileHandler(uri, path, cache_control);
   this->addHandler(handler);
 
   return handler;

@@ -20,10 +20,9 @@
 #endif
 
 #ifdef ARDUINO
+  #include "FS.h"
   #include <Arduino.h>
 #endif
-
-#include "FS.h"
 #include "esp_random.h"
 #include <ArduinoJson.h>
 #include <esp_http_server.h>

@@ -4,29 +4,42 @@
 /*  PsychicStaticFileHandler         */
 /*************************************/
 
-PsychicStaticFileHandler::PsychicStaticFileHandler(const char* uri, FS& fs, const char* path, const char* cache_control)
-    : _fs(fs), _uri(uri), _path(path), _default_file("index.html"), _cache_control(cache_control), _last_modified("")
+void PsychicStaticFileHandler::_initPath()
 {
   // Ensure leading '/'
-  if (_uri.length() == 0 || _uri[0] != '/')
+  if (_uri.empty() || _uri[0] != '/')
     _uri = "/" + _uri;
-  if (_path.length() == 0 || _path[0] != '/')
+  if (_path.empty() || _path[0] != '/')
     _path = "/" + _path;
 
   // If path ends with '/' we assume a hint that this is a directory to improve performance.
-  // However - if it does not end with '/' we, can't assume a file, path can still be a directory.
-  _isDir = _path[_path.length() - 1] == '/';
+  // However - if it does not end with '/' we can't assume a file, path can still be a directory.
+  _isDir = _path.back() == '/';
 
-  // Remove the trailing '/' so we can handle default file
+  // Remove the trailing '/' so we can handle default file.
   // Notice that root will be "" not "/"
-  if (_uri[_uri.length() - 1] == '/')
-    _uri = _uri.substring(0, _uri.length() - 1);
-  if (_path[_path.length() - 1] == '/')
-    _path = _path.substring(0, _path.length() - 1);
+  if (_uri.back() == '/')
+    _uri.pop_back();
+  if (_path.back() == '/')
+    _path.pop_back();
 
   // Reset stats
   _gzipFirst = false;
   _gzipStats = 0xF8;
+}
+
+#ifdef ARDUINO
+PsychicStaticFileHandler::PsychicStaticFileHandler(const char* uri, fs::FS& fs, const char* path, const char* cache_control)
+    : _fs(fs), _uri(uri), _path(path), _default_file("index.html"), _cache_control(cache_control ? cache_control : ""), _last_modified("")
+{
+  _initPath();
+}
+#endif
+
+PsychicStaticFileHandler::PsychicStaticFileHandler(const char* uri, const char* path, const char* cache_control)
+    : _uri(uri), _path(path), _default_file("index.html"), _cache_control(cache_control ? cache_control : ""), _last_modified("")
+{
+  _initPath();
 }
 
 PsychicStaticFileHandler* PsychicStaticFileHandler::setIsDir(bool isDir)
@@ -49,7 +62,7 @@ PsychicStaticFileHandler* PsychicStaticFileHandler::setCacheControl(const char* 
 
 PsychicStaticFileHandler* PsychicStaticFileHandler::setLastModified(const char* last_modified)
 {
-  _last_modified = String(last_modified);
+  _last_modified = last_modified;
   return this;
 }
 
@@ -82,11 +95,12 @@ bool PsychicStaticFileHandler::canHandle(PsychicRequest* request)
 
 bool PsychicStaticFileHandler::_getFile(PsychicRequest* request)
 {
-  // Remove the found uri
-  String path = String(request->uri()).substring(_uri.length());
+  // Remove the matched uri prefix to get the relative file path
+  std::string path(request->uri() + _uri.size());
 
-  // We can skip the file check and look for default if request is to the root of a directory or that request path ends with '/'
-  bool canSkipFileCheck = (_isDir && path.length() == 0) || (path.length() && path[path.length() - 1] == '/');
+  // We can skip the file check and look for default if request is to the root
+  // of a directory or that request path ends with '/'
+  bool canSkipFileCheck = (_isDir && path.empty()) || (!path.empty() && path.back() == '/');
 
   path = _path + path;
 
@@ -95,39 +109,37 @@ bool PsychicStaticFileHandler::_getFile(PsychicRequest* request)
     return true;
 
   // Can't handle if not default file
-  if (_default_file.length() == 0)
+  if (_default_file.empty())
     return false;
 
-  // Try to add default file, ensure there is a trailing '/' ot the path.
-  if (path.length() == 0 || path[path.length() - 1] != '/')
-    path += "/";
+  // Try to add default file; ensure there is a trailing '/' on the path.
+  if (path.empty() || path.back() != '/')
+    path += '/';
   path += _default_file;
 
   return _fileExists(path);
 }
 
-#define FILE_IS_REAL(f) (f == true && !f.isDirectory())
-
-bool PsychicStaticFileHandler::_fileExists(const String& path)
+bool PsychicStaticFileHandler::_fileExists(const std::string& path)
 {
   bool fileFound = false;
   bool gzipFound = false;
 
-  String gzip = path + ".gz";
+  std::string gzip = path + ".gz";
 
   if (_gzipFirst) {
-    _file = _fs.open(gzip, "r");
-    gzipFound = FILE_IS_REAL(_file);
+    _file = _fs.open(gzip.c_str(), "r");
+    gzipFound = (bool)_file;
     if (!gzipFound) {
-      _file = _fs.open(path, "r");
-      fileFound = FILE_IS_REAL(_file);
+      _file = _fs.open(path.c_str(), "r");
+      fileFound = (bool)_file;
     }
   } else {
-    _file = _fs.open(path, "r");
-    fileFound = FILE_IS_REAL(_file);
+    _file = _fs.open(path.c_str(), "r");
+    fileFound = (bool)_file;
     if (!fileFound) {
-      _file = _fs.open(gzip, "r");
-      gzipFound = FILE_IS_REAL(_file);
+      _file = _fs.open(gzip.c_str(), "r");
+      gzipFound = (bool)_file;
     }
   }
 
@@ -143,7 +155,7 @@ bool PsychicStaticFileHandler::_fileExists(const String& path)
     else if (_gzipStats == 0xFF)
       _gzipFirst = true; // All files are gzip
     else
-      _gzipFirst = _countBits(_gzipStats) > 4; // IF we have more gzip files - try gzip first
+      _gzipFirst = _countBits(_gzipStats) > 4; // IF we have more gzip files — try gzip first
   }
 
   ESP_LOGD(PH_TAG, "PsychicStaticFileHandler _fileExists(%s): %d", path.c_str(), found);
@@ -162,9 +174,9 @@ uint8_t PsychicStaticFileHandler::_countBits(const uint8_t value) const
 
 esp_err_t PsychicStaticFileHandler::handleRequest(PsychicRequest* request, PsychicResponse* res)
 {
-  if (_file == true) {
+  if (_file) {
     // is it not modified?
-    String etag = String(_file.size());
+    std::string etag = std::to_string(_file.size());
     if (_last_modified.length() && _last_modified == request->header("If-Modified-Since")) {
       _file.close();
       res->send(304); // Not modified
@@ -180,7 +192,7 @@ esp_err_t PsychicStaticFileHandler::handleRequest(PsychicRequest* request, Psych
     }
     // nope, send them the full file.
     else {
-      PsychicFileResponse response(res, _fs, _filename);
+      PsychicFileResponse response(res, _fs, _filename.c_str());
 
       if (_last_modified.length())
         response.addHeader("Last-Modified", _last_modified.c_str());

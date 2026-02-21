@@ -8,7 +8,9 @@
 
 ### New API
 
-- `PsychicRequest::getParam(const char* key, const char* defaultValue)` — returns `defaultValue` instead of `NULL` when the parameter is not found, avoiding null pointer crashes in handlers that don't call `hasParam()` first.
+- `PsychicRequest::getParam(const char* key, const char* defaultValue)` — returns `defaultValue` instead of `NULL` when the parameter is not found, avoiding null pointer crashes in handlers that don’t call `hasParam()` first.
+- `PsychicHttpServer::serveStatic(const char* uri, const char* path, const char* cache_control = nullptr)` — new overload that does not require an Arduino `fs::FS` reference; backed by POSIX via an ESP-IDF VFS partition. The existing `serveStatic(uri, fs::FS&, ...)` overload is preserved unchanged.
+- `PsychicFileResponse(PsychicResponse*, const char* path, const char* contentType = nullptr, bool download = false)` — new constructor that opens the file by path directly via POSIX, no `FS` object required. Existing Arduino constructors (`fs::FS&` + path and `fs::File` + path) are preserved unchanged.
 
 ### API Changes: getter methods now return `const char*` instead of `String`
 
@@ -47,6 +49,7 @@ url += request->getFilename();
 
 ### Internal Changes
 
+- Internal filesystem shim `PsychicFS.h`: `psychic::FS` / `psychic::File` provide a unified minimal interface used by all file-serving logic. The Arduino branch wraps `fs::FS&` / `fs::File`; the IDF branch is POSIX-backed (`fopen`/`fstat`/`fread`). The `FILE_IS_REAL` macro has been removed; its semantics are absorbed into `psychic::File::operator bool()`.
 - `httpd` task stack size increased from 4608 to 5120 bytes. `std::string` method frames are slightly larger than Arduino `String` due to libstdc++ EH cleanup stubs, which pushed deep call chains (upload handler + middleware + digest auth) over the 4608 limit. Confirmed crash at 4608, stable at 4800; 5120 gives a ~512 byte margin. Total cost: +3.5 KB across 7 open sockets.
 
 ---
