@@ -11,7 +11,7 @@
   #include <regex>
 #endif
 
-typedef std::map<String, String> SessionData;
+typedef std::map<std::string, std::string> SessionData;
 
 enum Disposition {
   NONE,
@@ -22,8 +22,8 @@ enum Disposition {
 
 struct ContentDisposition {
     Disposition disposition;
-    String filename;
-    String name;
+    std::string filename;
+    std::string name;
 };
 
 class PsychicRequest
@@ -39,9 +39,15 @@ class PsychicRequest
     PsychicEndpoint* _endpoint;
 
     http_method _method;
-    String _uri;
-    String _query;
-    String _body;
+    std::string _uri;
+    std::string _query;
+    std::string _body;
+    // _tmp and _filename back const char* return values — they must be class-level
+    // (not method-local) because the returned pointer must remain valid after the
+    // method returns. _tmp is a shared single-use buffer: consume the returned
+    // pointer immediately and do not hold it across another getter call.
+    std::string _tmp;
+    std::string _filename;
     esp_err_t _bodyParsed = ESP_ERR_NOT_FINISHED;
     esp_err_t _paramsParsed = ESP_ERR_NOT_FINISHED;
 
@@ -50,12 +56,12 @@ class PsychicRequest
     PsychicResponse* _response;
 
     void _setUri(const char* uri);
-    void _addParams(const String& params, bool post);
+    void _addParams(const char* params, bool post);
     void _parseGETParams();
     void _parsePOSTParams();
 
-    const String _extractParam(const String& authReq, const String& param, const char delimit);
-    const String _getRandomHexString();
+    std::string _extractParam(const char* authReq, const char* param, const char delimit);
+    std::string _getRandomHexString();
 
   public:
     PsychicRequest(PsychicHttpServer* server, httpd_req_t* req);
@@ -77,13 +83,18 @@ class PsychicRequest
     bool isMultipart();
     esp_err_t loadBody();
 
-    const String header(const char* name);
+    const char* header(const char* name);
     bool hasHeader(const char* name);
 
     static void freeSession(void* ctx);
-    bool hasSessionKey(const String& key);
-    const String getSessionKey(const String& key);
-    void setSessionKey(const String& key, const String& value);
+    bool hasSessionKey(const char* key);
+    const char* getSessionKey(const char* key);
+    void setSessionKey(const char* key, const char* value);
+#ifdef ARDUINO
+    bool hasSessionKey(const String& key) { return hasSessionKey(key.c_str()); }
+    const char* getSessionKey(const String& key) { return getSessionKey(key.c_str()); }
+    void setSessionKey(const String& key, const String& value) { setSessionKey(key.c_str(), value.c_str()); }
+#endif
 
     bool hasCookie(const char* key, size_t* size = nullptr);
 
@@ -110,34 +121,38 @@ class PsychicRequest
     esp_err_t getCookie(const char* key, char* buffer, size_t* size);
 
     // convenience / lazy function for getting cookies.
-    String getCookie(const char* key);
+    const char* getCookie(const char* key);
 
-    http_method method();       // returns the HTTP method used as enum value (eg. HTTP_GET)
-    const String methodStr();   // returns the HTTP method used as a string (eg. "GET")
-    const String path();        // returns the request path (eg /page?foo=bar returns "/page")
-    const String& uri();        // returns the full request uri (eg /page?foo=bar)
-    const String& query();      // returns the request query data (eg /page?foo=bar returns "foo=bar")
-    const String host();        // returns the requested host (request to http://psychic.local/foo will return "psychic.local")
-    const String contentType(); // returns the Content-Type header value
-    size_t contentLength();     // returns the Content-Length header value
-    const String& body();       // returns the body of the request
+    http_method method();      // returns the HTTP method used as enum value (eg. HTTP_GET)
+    const char* methodStr();   // returns the HTTP method used as a string (eg. "GET")
+    const char* path();        // returns the request path (eg /page?foo=bar returns "/page")
+    const char* uri();         // returns the full request uri (eg /page?foo=bar)
+    const char* query();       // returns the request query data (eg /page?foo=bar returns "foo=bar")
+    const char* host();        // returns the requested host (request to http://psychic.local/foo will return "psychic.local")
+    const char* contentType(); // returns the Content-Type header value
+    size_t contentLength();    // returns the Content-Length header value
+    const char* body();        // returns the body of the request
     const ContentDisposition getContentDisposition();
     const char* version() { return "HTTP/1.1"; }
 
-    const String& queryString() { return query(); } // compatability function.  same as query()
-    const String& url() { return uri(); }           // compatability function.  same as uri()
+    const char* queryString() { return query(); } // compatability function.  same as query()
+    const char* url() { return uri(); }           // compatability function.  same as uri()
 
     void loadParams();
     PsychicWebParameter* addParam(PsychicWebParameter* param);
-    PsychicWebParameter* addParam(const String& name, const String& value, bool decode = true, bool post = false);
+    PsychicWebParameter* addParam(const char* name, const char* value, bool decode = true, bool post = false);
+#ifdef ARDUINO
+    PsychicWebParameter* addParam(const String& name, const String& value, bool decode = true, bool post = false) { return addParam(name.c_str(), value.c_str(), decode, post); }
+#endif
     bool hasParam(const char* key);
     bool hasParam(const char* key, bool isPost, bool isFile = false);
     PsychicWebParameter* getParam(const char* name);
     PsychicWebParameter* getParam(const char* name, bool isPost, bool isFile = false);
+    const char* getParam(const char* name, const char* defaultValue);
 
-    const String getFilename();
+    const char* getFilename();
 
-    bool authenticate(const char * username, const char * password, bool passwordIsHashed = false);
+    bool authenticate(const char* username, const char* password, bool passwordIsHashed = false);
     esp_err_t requestAuthentication(HTTPAuthMethod mode, const char* realm, const char* authFailMsg);
 };
 

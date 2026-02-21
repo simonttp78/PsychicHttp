@@ -63,12 +63,12 @@ PsychicStaticFileHandler* PsychicStaticFileHandler::setLastModified(struct tm* l
 bool PsychicStaticFileHandler::canHandle(PsychicRequest* request)
 {
   if (request->method() != HTTP_GET) {
-    ESP_LOGD(PH_TAG, "Request %s refused by PsychicStaticFileHandler: %s", request->uri().c_str(), request->methodStr().c_str());
+    ESP_LOGD(PH_TAG, "Request %s refused by PsychicStaticFileHandler: %s", request->uri(), request->methodStr());
     return false;
   }
 
-  if (!request->uri().startsWith(_uri)) {
-    ESP_LOGD(PH_TAG, "Request %s refused by PsychicStaticFileHandler: does not start with %s", request->uri().c_str(), _uri.c_str());
+  if (strncmp(request->uri(), _uri.c_str(), _uri.length()) != 0) {
+    ESP_LOGD(PH_TAG, "Request %s refused by PsychicStaticFileHandler: does not start with %s", request->uri(), _uri.c_str());
     return false;
   }
 
@@ -76,14 +76,14 @@ bool PsychicStaticFileHandler::canHandle(PsychicRequest* request)
     return true;
   }
 
-  ESP_LOGD(PH_TAG, "Request %s refused by PsychicStaticFileHandler: file not found", request->uri().c_str());
+  ESP_LOGD(PH_TAG, "Request %s refused by PsychicStaticFileHandler: file not found", request->uri());
   return false;
 }
 
 bool PsychicStaticFileHandler::_getFile(PsychicRequest* request)
 {
   // Remove the found uri
-  String path = request->uri().substring(_uri.length());
+  String path = String(request->uri()).substring(_uri.length());
 
   // We can skip the file check and look for default if request is to the root of a directory or that request path ends with '/'
   bool canSkipFileCheck = (_isDir && path.length() == 0) || (path.length() && path[path.length() - 1] == '/');
@@ -170,7 +170,7 @@ esp_err_t PsychicStaticFileHandler::handleRequest(PsychicRequest* request, Psych
       res->send(304); // Not modified
     }
     // does our Etag match?
-    else if (_cache_control.length() && request->hasHeader("If-None-Match") && request->header("If-None-Match").equals(etag)) {
+    else if (_cache_control.length() && request->hasHeader("If-None-Match") && etag == request->header("If-None-Match")) {
       _file.close();
 
       res->addHeader("Cache-Control", _cache_control.c_str());

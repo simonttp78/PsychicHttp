@@ -66,7 +66,7 @@ esp_err_t PsychicEventSource::handleRequest(PsychicRequest* request, PsychicResp
     // did we get our last id?
     if (request->hasHeader("Last-Event-ID")) {
       PsychicEventSourceClient* buddy = getClient(client);
-      buddy->_lastId = atoi(request->header("Last-Event-ID").c_str());
+      buddy->_lastId = atoi(request->header("Last-Event-ID"));
     }
 
     // let our handler know.

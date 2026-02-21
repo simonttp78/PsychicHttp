@@ -128,7 +128,7 @@ If you have existing code using ESPAsyncWebserver, you will feel right at home w
    * AsyncWebServerRequest -> PsychicRequest
    * no more onBody() event
       * for small bodies (server.maxRequestBodySize, default 16k) it will be automatically loaded and accessed by request->body()
-      * for large bodies, use an upload handler and onUpload()   
+      * for large bodies, use an upload handler and onUpload()
    * websocket callbacks are much different (and simpler!)
    * websocket / eventsource handlers get attached to url in server.on("/url", &handler) instead of passing url to handler constructor.
    * eventsource callbacks are onOpen and onClose now.
@@ -162,7 +162,7 @@ void setup()
    //server.config is an ESP-IDF httpd_config struct
    //see: https://docs.espressif.com/projects/esp-idf/en/v4.4.6/esp32/api-reference/protocols/esp_http_server.html#_CPPv412httpd_config
    //increase maximum number of uri endpoint handlers (.on() calls)
-   server.config.max_uri_handlers = 20; 
+   server.config.max_uri_handlers = 20;
 
    //connect to wifi
 
@@ -273,7 +273,7 @@ It's worth noting that there is no standard way of passing in a filename for thi
      file = LittleFS.open(path, FILE_WRITE);
    else
      file = LittleFS.open(path, FILE_APPEND);
-   
+
    if(!file) {
      Serial.println("Failed to open file");
      return ESP_FAIL;
@@ -324,7 +324,7 @@ Very similar to the basic upload, with 2 key differences:
      file = LittleFS.open(path, FILE_WRITE);
    else
      file = LittleFS.open(path, FILE_APPEND);
-   
+
    if(!file) {
      Serial.println("Failed to open file");
      return ESP_FAIL;
@@ -348,9 +348,9 @@ Very similar to the basic upload, with 2 key differences:
 
    output += "<a href=\"" + url + "\">" + url + "</a><br/>\n";
    output += "Bytes: " + String(file->size()) + "<br/>\n";
-   output += "Param 1: " + request->getParam("param1")->value() + "<br/>\n";
-   output += "Param 2: " + request->getParam("param2")->value() + "<br/>\n";
-   
+   output += "Param 1: " + String(request->getParam("param1", "")) + "<br/>\n";
+   output += "Param 2: " + String(request->getParam("param2", "")) + "<br/>\n";
+
    return response->send(output.c_str());
  });
 
@@ -448,7 +448,7 @@ The onFrame() callback has 2 parameters:
 * ```httpd_ws_frame *frame``` ESP-IDF websocket struct.  The important struct members we care about are:
    * ```uint8_t *payload; /*!< Pre-allocated data buffer */```
    * ```size_t len; /*!< Length of the WebSocket data */```
- 
+
 For sending data on the websocket connection, there are 3 methods:
 
 * ```response->send()``` - only available in the onFrame() callback context.
@@ -572,7 +572,7 @@ The header file is not currently added to `PsychicHttp.h` and users will have to
 ```C++
 #include <TemplatePrinter.h>
 ```
- 
+
 ## Template parameter definition:
 
 - Must start and end with a preset delimiter, the default is `%`
@@ -646,7 +646,7 @@ bool templateHandler(Print &output, const char *param){
 
   }else if(strcmp(param, "MAX_ALLOC_HEAP") == 0){
     output.print((double)ESP.getMaxAllocHeap() / 1024.0, 2);
-    
+
   }else if(strcmp(param, "HEAP_SIZE") == 0){
     output.print((double)ESP.getHeapSize() / 1024.0, 2);
   }else{
@@ -661,7 +661,7 @@ server.on("/template", [](PsychicRequest *request) {
   PsychicStreamResponse response(request, "text/plain");
 
   response.beginSend();
-  
+
   TemplatePrinter printer(response, templateHandler);
 
   printer.println("My ESP has %FREE_HEAP% left. Its lifetime minimum heap is %MIN_FREE_HEAP%.");
@@ -671,7 +671,7 @@ server.on("/template", [](PsychicRequest *request) {
   printer.flush();
 
   return response.endSend();
-});   
+});
 ```
 
 The output for example looks like:
@@ -698,7 +698,7 @@ server.on("/home", [](PsychicRequest *request) {
   file.close();
 
   return response.endSend();
-}); 
+});
 ```
 
 ## Example 3 - Using the `TemplatePrinter::start` method.
@@ -791,5 +791,5 @@ The best way to get support is probably with Github issues.  There is also a [Di
 * support for esp-idf framework
 * Enable worker based multithreading with esp-idf v5.x
 * 100-continue support?
-     
+
 If anyone wants to take a crack at implementing any of the above features I am more than happy to accept pull requests.

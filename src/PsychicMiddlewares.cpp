@@ -1,6 +1,7 @@
 #include "PsychicMiddlewares.h"
 
-void LoggingMiddleware::setOutput(Print &output) {
+void LoggingMiddleware::setOutput(Print& output)
+{
   _out = &output;
 }
 
@@ -97,7 +98,7 @@ AuthenticationMiddleware& AuthenticationMiddleware::setAuthFailureMessage(const 
 
 bool AuthenticationMiddleware::isAllowed(PsychicRequest* request) const
 {
-  if (!_username.isEmpty() && !_password.isEmpty()) {
+  if (!_username.empty() && !_password.empty()) {
     return request->authenticate(_username.c_str(), _password.c_str());
   }
 
@@ -108,7 +109,7 @@ esp_err_t AuthenticationMiddleware::run(PsychicRequest* request, PsychicResponse
 {
   bool authenticationRequired = false;
 
-  if (!_username.isEmpty() && !_password.isEmpty()) {
+  if (!_username.empty() && !_password.empty()) {
     authenticationRequired = !request->authenticate(_username.c_str(), _password.c_str());
   }
 
@@ -155,7 +156,7 @@ void CorsMiddleware::addCORSHeaders(PsychicResponse* response)
   response->addHeader("Access-Control-Allow-Methods", _methods.c_str());
   response->addHeader("Access-Control-Allow-Headers", _headers.c_str());
   response->addHeader("Access-Control-Allow-Credentials", _credentials ? "true" : "false");
-  response->addHeader("Access-Control-Max-Age", String(_maxAge).c_str());
+  response->addHeader("Access-Control-Max-Age", std::to_string(_maxAge).c_str());
 }
 
 esp_err_t CorsMiddleware::run(PsychicRequest* request, PsychicResponse* response, PsychicMiddlewareNext next)

@@ -104,10 +104,8 @@ bool connectToWifi()
   int numberOfTries = 20;
 
   // Wait for the WiFi event
-  while (true)
-  {
-    switch (WiFi.status())
-    {
+  while (true) {
+    switch (WiFi.status()) {
       case WL_NO_SSID_AVAIL:
         Serial.println("[WiFi] SSID not found");
         break;
@@ -137,15 +135,12 @@ bool connectToWifi()
     }
     delay(tryDelay);
 
-    if (numberOfTries <= 0)
-    {
+    if (numberOfTries <= 0) {
       Serial.print("[WiFi] Failed to connect to WiFi!");
       // Use disconnect function to force stop trying to connect
       WiFi.disconnect();
       return false;
-    }
-    else
-    {
+    } else {
       numberOfTries--;
     }
   }
@@ -159,33 +154,25 @@ void setup()
   delay(10);
   Serial.println("PsychicHTTP Benchmark");
 
-  if (connectToWifi())
-  {
-    if (!LittleFS.begin())
-    {
+  if (connectToWifi()) {
+    if (!LittleFS.begin()) {
       Serial.println("LittleFS Mount Failed. Do Platform -> Build Filesystem Image and Platform -> Upload Filesystem Image from VSCode");
       return;
     }
 
     File fp = LittleFS.open("/server.crt");
-    if (fp)
-    {
+    if (fp) {
       server_cert = fp.readString();
-    }
-    else
-    {
+    } else {
       Serial.println("server.pem not found, SSL not available");
       return;
     }
     fp.close();
 
     File fp2 = LittleFS.open("/server.key");
-    if (fp2)
-    {
+    if (fp2) {
       server_key = fp2.readString();
-    }
-    else
-    {
+    } else {
       Serial.println("server.key not found, SSL not available");
       return;
     }
@@ -195,22 +182,19 @@ void setup()
     server.setCertificate(server_cert.c_str(), server_key.c_str());
 
     // our index
-    server.on("/", HTTP_GET, [](PsychicRequest* request)
-              { return response->send(200, "text/html", htmlContent); });
+    server.on("/", HTTP_GET, [](PsychicRequest* request) { return response->send(200, "text/html", htmlContent); });
 
     // serve static files from LittleFS/www on /
     server.serveStatic("/", LittleFS, "/www/");
 
     // a websocket echo server
-    websocketHandler.onFrame([](PsychicWebSocketRequest* request, httpd_ws_frame* frame)
-                             {
+    websocketHandler.onFrame([](PsychicWebSocketRequest* request, httpd_ws_frame* frame) {
       response->send(frame);
       return ESP_OK; });
     server.on("/ws", &websocketHandler);
 
     // api - parameters passed in via query eg. /api/endpoint?foo=bar
-    server.on("/api", HTTP_GET, [](PsychicRequest* request)
-              {
+    server.on("/api", HTTP_GET, [](PsychicRequest* request) {
       //create a response object
       StaticJsonDocument<128> output;
       output["msg"] = "status";
@@ -220,7 +204,7 @@ void setup()
       //work with some params
       if (request->hasParam("foo"))
       {
-        String foo = request->getParam("foo")->value();
+        String foo = request->getParam("foo", "");
         output["foo"] = foo;
       }
 
@@ -234,8 +218,7 @@ void setup()
 unsigned long last;
 void loop()
 {
-  if (millis() - last > 1000)
-  {
+  if (millis() - last > 1000) {
     Serial.printf("Free Heap: %d\n", esp_get_free_heap_size());
     last = millis();
   }

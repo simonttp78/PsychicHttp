@@ -25,7 +25,10 @@ PsychicHttpServer::PsychicHttpServer(uint16_t port)
   config.global_user_ctx = this;
   config.global_user_ctx_free_fn = PsychicHttpServer::destroy;
   config.uri_match_fn = MATCH_WILDCARD; // new internal endpoint matching - do not change this!!!
-  config.stack_size = 4608;             // default stack is just a little bit too small.
+  config.stack_size = 5120;             // 4608 is too small: std::string frames are slightly larger than
+                                        // Arduino String due to libstdc++ EH cleanup stubs, pushing deep
+                                        // call chains (upload + middlewares + digest auth) over the limit.
+                                        // Confirmed crash at 4608, stable at 4800; 5120 gives ~512 byte margin.
 
   // our internal matching function for endpoints
   _uri_match_fn = MATCH_WILDCARD; // use this change the endpoint matching function.
@@ -376,7 +379,7 @@ bool PsychicHttpServer::removeEndpoint(const char* uri, int method)
 
   // loop through our endpoints and see if anyone matches
   for (auto* endpoint : _endpoints) {
-    if (endpoint->uri().equals(uri) && method == endpoint->_method)
+    if (strcmp(endpoint->uri(), uri) == 0 && method == endpoint->_method)
       return removeEndpoint(endpoint);
   }
 
@@ -444,7 +447,7 @@ bool PsychicHttpServer::_rewriteRequest(PsychicRequest* request)
 {
   for (auto* r : _rewrites) {
     if (r->match(request)) {
-      request->_setUri(r->toUrl().c_str());
+      request->_setUri(r->toUrl());
       return true;
     }
   }
@@ -462,7 +465,7 @@ esp_err_t PsychicHttpServer::requestHandler(httpd_req_t* req)
 
   // run it through our global server filter list
   if (!server->_filter(&request)) {
-    ESP_LOGD(PH_TAG, "Request %s refused by global filter", request.uri().c_str());
+    ESP_LOGD(PH_TAG, "Request %s refused by global filter", request.uri());
     return request.response()->send(400);
   }
 
@@ -475,7 +478,7 @@ esp_err_t PsychicHttpServer::requestHandler(httpd_req_t* req)
   } else {
     ret = server->_process(&request);
   }
-  ESP_LOGD(PH_TAG, "Request %s processed by global middleware: %s", request.uri().c_str(), esp_err_to_name(ret));
+  ESP_LOGD(PH_TAG, "Request %s processed by global middleware: %s", request.uri(), esp_err_to_name(ret));
 
   if (ret == HTTPD_404_NOT_FOUND) {
     return PsychicHttpServer::notFoundHandler(req, HTTPD_404_NOT_FOUND);
@@ -488,7 +491,7 @@ esp_err_t PsychicHttpServer::_process(PsychicRequest* request)
 {
   // loop through our endpoints and see if anyone wants it.
   for (auto* endpoint : _endpoints) {
-    if (endpoint->matches(request->uri().c_str())) {
+    if (endpoint->matches(request->uri())) {
       if (endpoint->_method == request->method() || endpoint->_method == HTTP_ANY) {
         request->setEndpoint(endpoint);
         return endpoint->process(request);

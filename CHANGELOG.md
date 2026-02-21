@@ -1,3 +1,56 @@
+## Unreleased
+
+### Bug Fixes
+
+- `PsychicResponse::redirect()` was always returning HTTP 200 instead of 301 due to `_code` being initialised to 200 and the guard `if (!_code)` never triggering.
+- `getContentDisposition()` and `_setUri()` used `if (start)` / `if (index)` to check `std::string::find()` results, which incorrectly skipped matches at position 0. Fixed to `!= std::string::npos`.
+- `setSessionKey()` used `insert(pair<>)` which silently ignores updates to existing keys. Fixed to `operator[]`.
+
+### New API
+
+- `PsychicRequest::getParam(const char* key, const char* defaultValue)` — returns `defaultValue` instead of `NULL` when the parameter is not found, avoiding null pointer crashes in handlers that don't call `hasParam()` first.
+
+### API Changes: getter methods now return `const char*` instead of `String`
+
+The following getter methods have changed their return type from `String` to `const char*` to enable native ESP-IDF support (no Arduino framework dependency):
+
+| Method | Class |
+|---|---|
+| `uri()` | `PsychicEndpoint` |
+| `getContentType()` | `PsychicResponse` / `PsychicResponseDelegate` |
+| `name()`, `value()` | `PsychicWebParameter` |
+| `from()`, `toUrl()`, `params()` | `PsychicRewrite` |
+| `getSubprotocol()` | `PsychicHandler` |
+| `getUsername()`, `getPassword()`, `getRealm()`, `getAuthFailureMessage()` | `AuthenticationMiddleware` |
+| `getOrigin()`, `getMethods()`, `getHeaders()` | `CorsMiddleware` |
+| `methodStr()`, `path()`, `uri()`, `query()`, `header()`, `host()`, `contentType()`, `body()`, `getCookie()`, `getFilename()` | `PsychicRequest` |
+
+**For Arduino users, existing code will continue to compile without changes** — `String` has an implicit constructor from `const char*`:
+
+| Before | After | Result |
+|--------|-------|--------|
+| `String path = request->path();` | `String path = request->path();` | ✅ unchanged |
+| `String ct = request->contentType();` | `const char* ct = request->contentType();` | ✅ now also works |
+
+**One edge case that breaks** — concatenating with `+` when the left operand is a string literal (you'd know if you hit this, it's a compile error):
+
+```cpp
+// ❌ Compile error: cannot add const char* + const char*
+String url = "/prefix" + request->getFilename();
+
+// ✅ Fix: use String() cast or +=
+String url = String("/prefix") + request->getFilename();
+// or (recommended)
+String url = "/prefix";
+url += request->getFilename();
+```
+
+### Internal Changes
+
+- `httpd` task stack size increased from 4608 to 5120 bytes. `std::string` method frames are slightly larger than Arduino `String` due to libstdc++ EH cleanup stubs, which pushed deep call chains (upload handler + middleware + digest auth) over the 4608 limit. Confirmed crash at 4608, stable at 4800; 5120 gives a ~512 byte margin. Total cost: +3.5 KB across 7 open sockets.
+
+---
+
 ## 2.1.1
 
 - Re-added deleted MAX function per #230

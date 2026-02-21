@@ -5,7 +5,7 @@
 PsychicResponse::PsychicResponse(PsychicRequest* request) : _request(request),
                                                             _code(200),
                                                             _status(""),
-                                                            _contentType(emptyString),
+                                                            _contentType(""),
                                                             _contentLength(0),
                                                             _body("")
 {
@@ -167,7 +167,7 @@ esp_err_t PsychicResponse::send(const char* content)
 {
   if (!_code)
     setCode(200);
-  if (_contentType.isEmpty())
+  if (_contentType.empty())
     setContentType("text/html");
   setContent(content);
   return send();

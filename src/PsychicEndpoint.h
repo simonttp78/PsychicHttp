@@ -42,7 +42,7 @@ class PsychicEndpoint
     PsychicEndpoint* addMiddleware(PsychicMiddlewareCallback fn);
     void removeMiddleware(PsychicMiddleware* middleware);
 
-    String uri();
+    const char* uri();
 
     static esp_err_t requestCallback(httpd_req_t* req);
 };
