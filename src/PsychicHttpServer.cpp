@@ -655,7 +655,11 @@ bool ON_STA_FILTER(PsychicRequest* request)
   esp_netif_ip_info_t ip_info;
   if (esp_netif_get_ip_info(sta_netif, &ip_info) != ESP_OK)
     return false;
+#ifdef ARDUINO
   return ip_info.ip.addr == (uint32_t)request->client()->localIP();
+#else
+  return ip_info.ip.addr == request->client()->localIP().addr;
+#endif
 }
 
 bool ON_AP_FILTER(PsychicRequest* request)
@@ -669,14 +673,18 @@ bool ON_AP_FILTER(PsychicRequest* request)
   esp_netif_ip_info_t ip_info;
   if (esp_netif_get_ip_info(ap_netif, &ip_info) != ESP_OK)
     return false;
+#ifdef ARDUINO
   return ip_info.ip.addr == (uint32_t)request->client()->localIP();
+#else
+  return ip_info.ip.addr == request->client()->localIP().addr;
+#endif
 }
 
-String urlEncode(const char* str)
+static std::string _urlEncode_impl(const char* str)
 {
   static const char hex[] = "0123456789ABCDEF";
-  String output;
-  output.reserve(strlen(str)); // reserve memory to avoid reallocations for short inputs
+  std::string output;
+  output.reserve(strlen(str));
   while (*str) {
     unsigned char c = (unsigned char)*str++;
     if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
@@ -690,20 +698,19 @@ String urlEncode(const char* str)
   return output;
 }
 
-String urlDecode(const char* encoded)
+static std::string _urlDecode_impl(const char* encoded)
 {
-  // inline hex nibble decode is ~10x faster than sscanf("%2x")
   auto hexVal = [](char c) -> unsigned char {
     if (c >= '0' && c <= '9')
       return c - '0';
     if (c >= 'a' && c <= 'f')
       return c - 'a' + 10;
-    return c - 'A' + 10; // 'A'..'F'
+    return c - 'A' + 10;
   };
 
   size_t length = strlen(encoded);
   std::string output;
-  output.reserve(length); // decoded is always <= encoded length
+  output.reserve(length);
   for (size_t i = 0; i < length; ++i) {
     if (encoded[i] == '%' && isxdigit(encoded[i + 1]) && isxdigit(encoded[i + 2])) {
       output += (char)((hexVal(encoded[i + 1]) << 4) | hexVal(encoded[i + 2]));
@@ -714,8 +721,16 @@ String urlDecode(const char* encoded)
       output += encoded[i];
     }
   }
-  return output.c_str();
+  return output;
 }
+
+#ifdef ARDUINO
+String urlEncode(const char* str) { return _urlEncode_impl(str).c_str(); }
+String urlDecode(const char* encoded) { return _urlDecode_impl(encoded).c_str(); }
+#else
+std::string urlEncode(const char* str) { return _urlEncode_impl(str); }
+std::string urlDecode(const char* encoded) { return _urlDecode_impl(encoded); }
+#endif
 
 bool psychic_uri_match_simple(const char* uri1, const char* uri2, size_t len2)
 {

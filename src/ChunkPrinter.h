@@ -1,8 +1,10 @@
 #ifndef ChunkPrinter_h
 #define ChunkPrinter_h
 
-#include "PsychicResponse.h"
-#include <Print.h>
+#ifdef ARDUINO
+
+  #include "PsychicResponse.h"
+  #include <Print.h>
 
 class ChunkPrinter : public Print
 {
@@ -24,4 +26,6 @@ class ChunkPrinter : public Print
     void flush() override;
 };
 
-#endif
+#endif // ARDUINO
+
+#endif // ChunkPrinter_h

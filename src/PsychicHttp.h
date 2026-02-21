@@ -15,7 +15,9 @@
 #include "PsychicRequest.h"
 #include "PsychicResponse.h"
 #include "PsychicStaticFileHandler.h"
-#include "PsychicStreamResponse.h"
+#ifdef ARDUINO
+  #include "PsychicStreamResponse.h"
+#endif
 #include "PsychicUploadHandler.h"
 #include "PsychicVersion.h"
 #include "PsychicWebSocket.h"

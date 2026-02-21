@@ -1,8 +1,10 @@
 #ifndef TemplatePrinter_h
 #define TemplatePrinter_h
 
-#include "PsychicCore.h"
-#include <Print.h>
+#ifdef ARDUINO
+
+  #include "PsychicCore.h"
+  #include <Print.h>
 
 /************************************************************
 
@@ -50,4 +52,5 @@ class TemplatePrinter : public Print
     size_t copyFrom(Stream& stream);
 };
 
-#endif
+#endif // ARDUINO
+#endif // TemplatePrinter_h

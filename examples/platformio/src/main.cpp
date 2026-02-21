@@ -711,7 +711,7 @@ void setup()
       Serial.printf("[socket] connection #%u connected from %s\n", client->socket(), client->remoteIP().toString().c_str());
       client->sendMessage("Hello!");
     });
-    websocketHandler.onFrame([](PsychicWebSocketRequest* request, httpd_ws_frame* frame) {
+    websocketHandler.onFrame([](PsychicWebSocketRequest* request, httpd_ws_frame_t* frame) {
       // Serial.printf("[socket] #%d sent: %s\n", request->client()->socket(), String((char*)frame->payload, frame->len).c_str());
       return request->reply(frame);
     });

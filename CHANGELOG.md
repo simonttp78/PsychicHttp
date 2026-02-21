@@ -1,7 +1,26 @@
 ## Unreleased
 
+### Native ESP-IDF Support (no Arduino framework required)
+
+PsychicHttp can now be used in pure ESP-IDF projects without the Arduino component.
+
+**Library source:**
+- `PsychicCore.h`: `urlEncode`/`urlDecode` refactored to `_impl` functions returning `std::string`; thin `#ifdef ARDUINO` wrappers preserve the `String` API for Arduino users. `PsychicUploadCallback` typedef is now conditional — Arduino keeps `const String& filename` (no user-code changes required); native IDF uses `const char* filename`. `HTTPHeader` fields are `std::string` internally; `addHeader(const String&, ...)` kept under `#ifdef ARDUINO`.
+- `ChunkPrinter`, `TemplatePrinter`, `PsychicStreamResponse`: gated `#ifdef ARDUINO` (depend on Arduino `Print`/`Stream` which have no IDF equivalent); excluded from `PsychicHttp.h` on non-Arduino builds.
+- `PsychicClient`: `localIP()` / `remoteIP()` return `esp_ip4_addr_t` on native IDF; `#ifdef ARDUINO` overloads returning `IPAddress` preserved for Arduino users.
+- `PsychicMiddlewares` `LoggingMiddleware`: Arduino uses `Print&` / `Serial`; native IDF uses `ESP_LOGI` — same public interface.
+- `PsychicEventSource`: `generateEventMessage` returns `std::string` in native IDF via internal `_generateEventMessage_impl`.
+- `PsychicJson`: large JSON path uses `ChunkPrinter` on Arduino and `malloc` + one-shot send on native IDF.
+- `PsychicRequest`: base64 encoding for digest auth selects `mbedtls_base64_encode` (IDF ≥ 5) vs `base64_encode_chars` (IDF 4) via `ESP_IDF_VERSION_MAJOR` guard.
+- `PsychicResponse`: `equalsIgnoreCase()` → `strcasecmp()` for `std::string` compatibility; `#include <strings.h>` added.
+- `MultipartProcessor`, `PsychicUploadHandler`: `std::min()` with explicit casts; `const char*` for internal string access.
+- `sdkconfig.defaults` (`examples/esp-idf-pio/`): `CONFIG_HTTPD_WS_SUPPORT=y` required for WebSocket types; `CONFIG_MBEDTLS_ROM_MD5` disabled (ROM-only MD5 makes `mbedtls_md5_*` unavailable at link time).
+
+**New example:** `examples/esp-idf-pio/` — fully native ESP-IDF PlatformIO example (WiFi STA+AP, HTTP handlers, basic auth middleware, WebSocket echo, SSE). Live tested on hardware. Builds with `[env:esp-idf-pio]` (`framework = espidf`).
+
 ### Bug Fixes
 
+- `PsychicJsonResponse::send()` was calling itself recursively — the bare `send()` inside the method resolved to `this->send()` instead of the base `PsychicResponse::send()`, causing infinite recursion and a stack overflow on any JSON response. Fixed by calling `_response->send()` explicitly. This affected all JSON responses when not using the chunked path.
 - `PsychicResponse::redirect()` was always returning HTTP 200 instead of 301 due to `_code` being initialised to 200 and the guard `if (!_code)` never triggering.
 - `getContentDisposition()` and `_setUri()` used `if (start)` / `if (index)` to check `std::string::find()` results, which incorrectly skipped matches at position 0. Fixed to `!= std::string::npos`.
 - `setSessionKey()` used `insert(pair<>)` which silently ignores updates to existing keys. Fixed to `operator[]`.
@@ -47,10 +66,18 @@ String url = "/prefix";
 url += request->getFilename();
 ```
 
+### Example Updates (v2.x API)
+
+- **All examples**: `server.begin()` must be called *after* all `server.on()` registrations. WebSocket and SSE endpoints are registered with `httpd` inside `begin()` / `start()`; calling `on()` after `begin()` silently registers the URL but the WS upgrade or SSE accept is never wired up.
+- `examples/arduino/arduino.ino`: `StaticJsonDocument<N>` → `JsonDocument` (ArduinoJson v7); inline `request->authenticate()` / `requestAuthentication()` → `AuthenticationMiddleware` with `addMiddleware()`; `httpd_ws_frame` → `httpd_ws_frame_t`.
+- `examples/arduino/arduino_ota/`, `examples/arduino/arduino_captive_portal/`: `server.begin()` added after all `server.on()` calls (was missing).
+- `examples/websockets/src/main.cpp`, `examples/platformio/src/main.cpp`: `httpd_ws_frame` → `httpd_ws_frame_t`.
+- `examples/esp-idf/main/main.cpp`: `server.begin()` ordering fixed; `websocketHandler.onMessage` → `onFrame`; `httpd_ws_frame` → `httpd_ws_frame_t`.
+
 ### Internal Changes
 
 - Internal filesystem shim `PsychicFS.h`: `psychic::FS` / `psychic::File` provide a unified minimal interface used by all file-serving logic. The Arduino branch wraps `fs::FS&` / `fs::File`; the IDF branch is POSIX-backed (`fopen`/`fstat`/`fread`). The `FILE_IS_REAL` macro has been removed; its semantics are absorbed into `psychic::File::operator bool()`.
-- `CMakeLists.txt`: `arduino-esp32` is no longer an unconditional `COMPONENT_REQUIRES` entry. Set `PSYCHIC_ARDUINO=ON` in your cmake invocation when building with the Arduino component. Pure ESP-IDF builds (`PSYCHIC_ARDUINO=OFF`, the default) no longer pull in `arduino-esp32`. `esp_http_server` and `mbedtls` added as explicit deps in both branches.
+- `CMakeLists.txt`: `arduino-esp32` is no longer an unconditional `COMPONENT_REQUIRES` entry. It is now auto-detected via `idf_build_get_property(BUILD_COMPONENTS)` at configure time — if the `arduino` component is present in the project the dep is added automatically and the `ARDUINO` define flows through as before. Pure ESP-IDF projects (without the Arduino component) require no manual flag. `esp_http_server` and `mbedtls` added as explicit deps in both branches.
 - `httpd` task stack size increased from 4608 to 5120 bytes. `std::string` method frames are slightly larger than Arduino `String` due to libstdc++ EH cleanup stubs, which pushed deep call chains (upload handler + middleware + digest auth) over the 4608 limit. Confirmed crash at 4608, stable at 4800; 5120 gives a ~512 byte margin. Total cost: +3.5 KB across 7 open sockets.
 
 ---

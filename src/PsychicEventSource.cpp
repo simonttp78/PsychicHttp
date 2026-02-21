@@ -135,7 +135,7 @@ void PsychicEventSource::closeCallback(PsychicClient* client)
  */
 void PsychicEventSource::send(const char* message, const char* event, uint32_t id, uint32_t reconnect)
 {
-  String ev = generateEventMessage(message, event, id, reconnect);
+  auto ev = generateEventMessage(message, event, id, reconnect);
   std::vector<PsychicClient*> clientsToRemove;
 
   // First, iterate and send, collecting disconnected clients
@@ -170,7 +170,7 @@ PsychicEventSourceClient::~PsychicEventSourceClient()
  */
 bool PsychicEventSourceClient::send(const char* message, const char* event, uint32_t id, uint32_t reconnect)
 {
-  String ev = generateEventMessage(message, event, id, reconnect);
+  auto ev = generateEventMessage(message, event, id, reconnect);
   return sendEvent(ev.c_str());
 }
 
@@ -233,7 +233,7 @@ esp_err_t PsychicEventSourceResponse::send()
 // Event Message Generator
 /*****************************************/
 
-String generateEventMessage(const char* message, const char* event, uint32_t id, uint32_t reconnect)
+static std::string _generateEventMessage_impl(const char* message, const char* event, uint32_t id, uint32_t reconnect)
 {
   std::string ev;
 
@@ -261,6 +261,17 @@ String generateEventMessage(const char* message, const char* event, uint32_t id,
     ev += "\r\n";
   }
   ev += "\r\n";
-
-  return ev.c_str();
+  return ev;
 }
+
+#ifdef ARDUINO
+String generateEventMessage(const char* message, const char* event, uint32_t id, uint32_t reconnect)
+{
+  return _generateEventMessage_impl(message, event, id, reconnect).c_str();
+}
+#else
+std::string generateEventMessage(const char* message, const char* event, uint32_t id, uint32_t reconnect)
+{
+  return _generateEventMessage_impl(message, event, id, reconnect);
+}
+#endif

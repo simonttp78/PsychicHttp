@@ -1,6 +1,6 @@
 # PsychicHttp - HTTP on your ESP 🧙🔮
 
-PsychicHttp is a webserver library for ESP32 + Arduino framework which uses the [ESP-IDF HTTP Server](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/protocols/esp_http_server.html) library under the hood.  It is written in a similar style to the [Arduino WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer), [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer), and [ArduinoMongoose](https://github.com/jeremypoulter/ArduinoMongoose) libraries to make writing code simple and porting from those other libraries straightforward.
+PsychicHttp is a webserver library for ESP32 that supports both the **Arduino framework** and **native ESP-IDF** (no Arduino component required).  It is built on top of the [ESP-IDF HTTP Server](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/protocols/esp_http_server.html) and is written in a similar style to the [Arduino WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer), [ESPAsyncWebServer](https://github.com/me-no-dev/ESPAsyncWebServer), and [ArduinoMongoose](https://github.com/jeremypoulter/ArduinoMongoose) libraries to make writing code simple and porting from those other libraries straightforward.
 
 **Discord**: [https://discord.gg/TAQrTR3f9C](https://discord.gg/TAQrTR3f9C)
 
@@ -31,7 +31,7 @@ PsychicHttp is a webserver library for ESP32 + Arduino framework which uses the 
 
 ## Installation
 
-### Platformio
+### PlatformIO (Arduino framework)
 
 [PlatformIO](http://platformio.org) is an open source ecosystem for IoT development.
 
@@ -39,7 +39,7 @@ PsychicHttp is a webserver library for ESP32 + Arduino framework which uses the 
 
 ```ini
 [env:myboard]
-platform = espressif...
+platform = espressif32
 board = ...
 framework = arduino
 
@@ -50,7 +50,28 @@ lib_deps = hoeken/PsychicHttp
 lib_deps = https://github.com/hoeken/PsychicHttp
 ```
 
-### Installation - Arduino
+### PlatformIO (native ESP-IDF framework)
+
+PsychicHttp supports native ESP-IDF projects (no Arduino component required):
+
+```ini
+[env:myboard]
+platform = espressif32
+board = ...
+framework = espidf
+lib_deps = hoeken/PsychicHttp
+```
+
+You must also add to your `sdkconfig.defaults`:
+
+```ini
+CONFIG_HTTPD_WS_SUPPORT=y
+# CONFIG_MBEDTLS_ROM_MD5 is not set
+```
+
+See `examples/esp-idf-pio/` for a complete working example.
+
+### Installation - Arduino IDE
 
 Open *Tools -> Manage Libraries...* and search for PsychicHttp.
 
@@ -412,7 +433,7 @@ Here are the callback definitions:
 
 ```cpp
 void open_function(PsychicWebSocketClient *client);
-esp_err_t frame_function(PsychicWebSocketRequest *request, httpd_ws_frame *frame);
+esp_err_t frame_function(PsychicWebSocketRequest *request, httpd_ws_frame_t *frame);
 void close_function(PsychicWebSocketClient *client);
 ```
 
@@ -429,7 +450,7 @@ Here is a basic example of using WebSockets:
    client->sendMessage("Hello!");
  });
 
- websocketHandler.onFrame([](PsychicWebSocketRequest *request, httpd_ws_frame *frame) {
+ websocketHandler.onFrame([](PsychicWebSocketRequest *request, httpd_ws_frame_t *frame) {
      Serial.printf("[socket] #%d sent: %s\n", request->client()->socket(), (char *)frame->payload);
      return response->send(frame);
  });
@@ -445,7 +466,7 @@ Here is a basic example of using WebSockets:
 The onFrame() callback has 2 parameters:
 
 * ```PsychicWebSocketRequest *request``` a special request with helper functions for replying in websocket format.
-* ```httpd_ws_frame *frame``` ESP-IDF websocket struct.  The important struct members we care about are:
+* ```httpd_ws_frame_t *frame``` ESP-IDF websocket struct.  The important struct members we care about are:
    * ```uint8_t *payload; /*!< Pre-allocated data buffer */```
    * ```size_t len; /*!< Length of the WebSocket data */```
 
@@ -788,7 +809,6 @@ The best way to get support is probably with Github issues.  There is also a [Di
 ## Longterm Wants
 
 * investigate websocket performance gap
-* support for esp-idf framework
 * Enable worker based multithreading with esp-idf v5.x
 * 100-continue support?
 

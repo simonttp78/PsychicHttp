@@ -6,13 +6,15 @@ set(COMPONENT_ADD_INCLUDEDIRS
     "src"
 )
 
-# Set PSYCHIC_ARDUINO=ON when building with the arduino-esp32 component.
-# For pure ESP-IDF builds (no Arduino framework), leave it OFF (the default).
-option(PSYCHIC_ARDUINO "Build with Arduino framework support" OFF)
+# Detect Arduino framework automatically: if the arduino component is present
+# in the project's build (i.e. the user has it in their EXTRA_COMPONENT_DIRS or
+# managed_components), add it as a dep and the ARDUINO define flows through.
+# No manual flag needed — pure IDF projects just don't include the component.
+idf_build_get_property(build_components BUILD_COMPONENTS)
 
-if(PSYCHIC_ARDUINO)
+if("arduino" IN_LIST build_components)
     set(COMPONENT_REQUIRES
-        "arduino-esp32"
+        "arduino"
         "esp_https_server"
         "esp_http_server"
         "mbedtls"

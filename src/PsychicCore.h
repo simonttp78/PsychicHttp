@@ -26,7 +26,15 @@
 #include "esp_random.h"
 #include <ArduinoJson.h>
 #include <esp_http_server.h>
-#include <libb64/cencode.h>
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION_MAJOR >= 5
+  #include <mbedtls/base64.h>
+#else
+  #include <libb64/cencode.h>
+#endif
+#include <algorithm>
+#include <esp_log.h>
+#include <functional>
 #include <list>
 #include <map>
 #include <mbedtls/md5.h>
@@ -41,8 +49,13 @@ enum HTTPAuthMethod {
   DIGEST_AUTH
 };
 
+#ifdef ARDUINO
 String urlEncode(const char* str);
 String urlDecode(const char* encoded);
+#else
+std::string urlEncode(const char* str);
+std::string urlDecode(const char* encoded);
+#endif
 
 class PsychicHttpServer;
 class PsychicRequest;
@@ -63,11 +76,15 @@ typedef std::function<void(PsychicClient* client)> PsychicClientCallback;
 // callback definitions
 typedef std::function<esp_err_t(PsychicRequest* request, PsychicResponse* response)> PsychicHttpRequestCallback;
 typedef std::function<esp_err_t(PsychicRequest* request, PsychicResponse* response, JsonVariant& json)> PsychicJsonRequestCallback;
+#ifdef ARDUINO
 typedef std::function<esp_err_t(PsychicRequest* request, const String& filename, uint64_t index, uint8_t* data, size_t len, bool final)> PsychicUploadCallback;
+#else
+typedef std::function<esp_err_t(PsychicRequest* request, const char* filename, uint64_t index, uint8_t* data, size_t len, bool final)> PsychicUploadCallback;
+#endif
 
 struct HTTPHeader {
-    String field;
-    String value;
+    std::string field;
+    std::string value;
 };
 
 class DefaultHeaders
@@ -77,15 +94,17 @@ class DefaultHeaders
   public:
     DefaultHeaders() {}
 
-    void addHeader(const String& field, const String& value)
-    {
-      _headers.push_back({field, value});
-    }
-
     void addHeader(const char* field, const char* value)
     {
       _headers.push_back({field, value});
     }
+
+#ifdef ARDUINO
+    void addHeader(const String& field, const String& value)
+    {
+      _headers.push_back({field.c_str(), value.c_str()});
+    }
+#endif
 
     const std::list<HTTPHeader>& getHeaders() { return _headers; }
 

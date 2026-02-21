@@ -60,10 +60,8 @@ bool connectToWifi()
   int numberOfTries = 20;
 
   // Wait for the WiFi event
-  while (true)
-  {
-    switch (WiFi.status())
-    {
+  while (true) {
+    switch (WiFi.status()) {
       case WL_NO_SSID_AVAIL:
         Serial.println("[WiFi] SSID not found");
         break;
@@ -93,15 +91,12 @@ bool connectToWifi()
     }
     delay(tryDelay);
 
-    if (numberOfTries <= 0)
-    {
+    if (numberOfTries <= 0) {
       Serial.print("[WiFi] Failed to connect to WiFi!");
       // Use disconnect function to force stop trying to connect
       WiFi.disconnect();
       return false;
-    }
-    else
-    {
+    } else {
       numberOfTries--;
     }
   }
@@ -121,18 +116,15 @@ void setup()
 
   // We start by connecting to a WiFi network
   // To debug, please enable Core Debug Level to Verbose
-  if (connectToWifi())
-  {
+  if (connectToWifi()) {
     // set up our esp32 to listen on the local_hostname.local domain
-    if (!MDNS.begin(local_hostname))
-    {
+    if (!MDNS.begin(local_hostname)) {
       Serial.println("Error starting mDNS");
       return;
     }
     MDNS.addService("http", "tcp", 80);
 
-    if (!LittleFS.begin())
-    {
+    if (!LittleFS.begin()) {
       Serial.println("LittleFS Mount Failed. Do Platform -> Build Filesystem Image and Platform -> Upload Filesystem Image from VSCode");
       return;
     }
@@ -144,12 +136,10 @@ void setup()
     // a websocket echo server
     //  npm install -g wscat
     //  wscat -c ws://psychic.local/ws
-    websocketHandler.onOpen([](PsychicWebSocketClient* client)
-                            {
+    websocketHandler.onOpen([](PsychicWebSocketClient* client) {
       Serial.printf("[socket] connection #%u connected from %s\n", client->socket(), client->remoteIP().toString().c_str());
       client->sendMessage("Hello!"); });
-    websocketHandler.onFrame([](PsychicWebSocketRequest* request, httpd_ws_frame* frame)
-                             {
+    websocketHandler.onFrame([](PsychicWebSocketRequest* request, httpd_ws_frame_t* frame) {
       Serial.printf("[socket] #%d sent: %s\n", request->client()->socket(), (char *)frame->payload);
 
       //we are allocating memory here, and the worker will free it
@@ -162,11 +152,11 @@ void setup()
       if (wm.buffer == NULL)
       {
         Serial.printf("Queue message: unable to allocate %d bytes\n", frame->len);
-        return ESP_FAIL;    
+        return ESP_FAIL;
       }
 
       //okay, copy it over
-      memcpy(wm.buffer, frame->payload, frame->len); 
+      memcpy(wm.buffer, frame->payload, frame->len);
 
       //try to throw it in our queue
       if (xQueueSend(wsMessages, &wm, 1) != pdTRUE)
@@ -182,9 +172,11 @@ void setup()
         return request->reply("Queue Full");
 
       return ESP_OK; });
-    websocketHandler.onClose([](PsychicWebSocketClient* client)
-                             { Serial.printf("[socket] connection #%u closed from %s\n", client->socket(), client->remoteIP().toString().c_str()); });
+    websocketHandler.onClose([](PsychicWebSocketClient* client) { Serial.printf("[socket] connection #%u closed from %s\n", client->socket(), client->remoteIP().toString().c_str()); });
     server.on("/ws", &websocketHandler);
+
+    // start the server - must be called AFTER all server.on() calls
+    server.begin();
   }
 }
 
@@ -195,12 +187,10 @@ void loop()
 {
   // process our websockets outside the callback.
   WebsocketMessage message;
-  while (xQueueReceive(wsMessages, &message, 0) == pdTRUE)
-  {
+  while (xQueueReceive(wsMessages, &message, 0) == pdTRUE) {
     // make sure our client is still good.
     PsychicWebSocketClient* client = websocketHandler.getClient(message.socket);
-    if (client == NULL)
-    {
+    if (client == NULL) {
       Serial.printf("[socket] client #%d bad, bailing\n", message.socket);
       return;
     }
@@ -214,8 +204,7 @@ void loop()
   }
 
   // send a periodic update to all clients
-  if (millis() - lastUpdate > 2000)
-  {
+  if (millis() - lastUpdate > 2000) {
     sprintf(output, "Millis: %lu\n", millis());
     websocketHandler.sendAll(output);
 

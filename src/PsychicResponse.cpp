@@ -1,6 +1,7 @@
 #include "PsychicResponse.h"
 #include "PsychicRequest.h"
 #include <http_status.h>
+#include <strings.h>
 
 PsychicResponse::PsychicResponse(PsychicRequest* request) : _request(request),
                                                             _code(200),
@@ -23,7 +24,7 @@ void PsychicResponse::addHeader(const char* field, const char* value)
 {
   // erase any existing ones.
   for (auto itr = _headers.begin(); itr != _headers.end();) {
-    if (itr->field.equalsIgnoreCase(field))
+    if (strcasecmp(itr->field.c_str(), field) == 0)
       itr = _headers.erase(itr);
     else
       itr++;

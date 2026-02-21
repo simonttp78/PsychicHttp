@@ -3,10 +3,13 @@
 
 #include "PsychicMiddleware.h"
 
-#include <Stream.h>
+#ifdef ARDUINO
+  #include <Stream.h>
+#endif
 #include <http_status.h>
 
 // curl-like logging middleware
+#ifdef ARDUINO
 class LoggingMiddleware : public PsychicMiddleware
 {
   public:
@@ -15,8 +18,15 @@ class LoggingMiddleware : public PsychicMiddleware
     esp_err_t run(PsychicRequest* request, PsychicResponse* response, PsychicMiddlewareNext next) override;
 
   private:
-    Print* _out;
+    Print* _out = nullptr;
 };
+#else
+class LoggingMiddleware : public PsychicMiddleware
+{
+  public:
+    esp_err_t run(PsychicRequest* request, PsychicResponse* response, PsychicMiddlewareNext next) override;
+};
+#endif
 
 class AuthenticationMiddleware : public PsychicMiddleware
 {

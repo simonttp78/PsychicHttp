@@ -1,5 +1,6 @@
 #include "MultipartProcessor.h"
 #include "PsychicRequest.h"
+#include <algorithm>
 #include <strings.h>
 
 enum {
@@ -41,9 +42,10 @@ esp_err_t MultipartProcessor::process()
 
   _parsedLength = 0;
 
-  String value = _request->header("Content-Type");
-  if (value.startsWith("multipart/")) {
-    _boundary = value.substring(value.indexOf('=') + 1).c_str();
+  const char* value = _request->header("Content-Type");
+  if (value && strncmp(value, "multipart/", 10) == 0) {
+    const char* eq = strchr(value, '=');
+    _boundary = (eq ? eq + 1 : "");
     size_t pos;
     while ((pos = _boundary.find('"')) != std::string::npos)
       _boundary.erase(pos, 1);
@@ -65,7 +67,7 @@ esp_err_t MultipartProcessor::process()
 #endif
 
     /* Receive the file part by part into a buffer */
-    if ((received = httpd_req_recv(_request->request(), buf, min(remaining, FILE_CHUNK_SIZE))) <= 0) {
+    if ((received = httpd_req_recv(_request->request(), buf, std::min(remaining, (int)FILE_CHUNK_SIZE))) <= 0) {
       /* Retry if timeout occurred */
       if (received == HTTPD_SOCK_ERR_TIMEOUT)
         continue;
@@ -100,9 +102,10 @@ esp_err_t MultipartProcessor::process(const char* body)
   esp_err_t err = ESP_OK;
   _parsedLength = 0;
 
-  String value = _request->header("Content-Type");
-  if (value.startsWith("multipart/")) {
-    _boundary = value.substring(value.indexOf('=') + 1).c_str();
+  const char* value = _request->header("Content-Type");
+  if (value && strncmp(value, "multipart/", 10) == 0) {
+    const char* eq = strchr(value, '=');
+    _boundary = (eq ? eq + 1 : "");
     size_t pos;
     while ((pos = _boundary.find('"')) != std::string::npos)
       _boundary.erase(pos, 1);
@@ -110,8 +113,6 @@ esp_err_t MultipartProcessor::process(const char* body)
     ESP_LOGE(PH_TAG, "No multipart boundary found.");
     return ESP_ERR_HTTPD_INVALID_REQ;
   }
-
-  // loop over the whole string
   unsigned int size = strlen(body);
   for (unsigned i = 0; i < size; i++) {
     // send it to our parser

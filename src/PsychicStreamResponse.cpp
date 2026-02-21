@@ -1,6 +1,8 @@
-#include "PsychicStreamResponse.h"
-#include "PsychicRequest.h"
-#include "PsychicResponse.h"
+#ifdef ARDUINO
+
+  #include "PsychicStreamResponse.h"
+  #include "PsychicRequest.h"
+  #include "PsychicResponse.h"
 
 PsychicStreamResponse::PsychicStreamResponse(PsychicResponse* response, const String& contentType)
     : PsychicResponseDelegate(response), _buffer(NULL)
@@ -85,3 +87,5 @@ size_t PsychicStreamResponse::copyFrom(Stream& stream)
 
   return 0;
 }
+
+#endif // ARDUINO

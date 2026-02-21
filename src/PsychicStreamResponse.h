@@ -1,9 +1,11 @@
 #ifndef PsychicStreamResponse_h
 #define PsychicStreamResponse_h
 
-#include "ChunkPrinter.h"
-#include "PsychicCore.h"
-#include "PsychicResponse.h"
+#ifdef ARDUINO
+
+  #include "ChunkPrinter.h"
+  #include "PsychicCore.h"
+  #include "PsychicResponse.h"
 
 class PsychicRequest;
 
@@ -31,5 +33,7 @@ class PsychicStreamResponse : public PsychicResponseDelegate, public Print
 
     using Print::write;
 };
+
+#endif // ARDUINO
 
 #endif // PsychicStreamResponse_h
