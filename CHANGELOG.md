@@ -50,6 +50,7 @@ url += request->getFilename();
 ### Internal Changes
 
 - Internal filesystem shim `PsychicFS.h`: `psychic::FS` / `psychic::File` provide a unified minimal interface used by all file-serving logic. The Arduino branch wraps `fs::FS&` / `fs::File`; the IDF branch is POSIX-backed (`fopen`/`fstat`/`fread`). The `FILE_IS_REAL` macro has been removed; its semantics are absorbed into `psychic::File::operator bool()`.
+- `CMakeLists.txt`: `arduino-esp32` is no longer an unconditional `COMPONENT_REQUIRES` entry. Set `PSYCHIC_ARDUINO=ON` in your cmake invocation when building with the Arduino component. Pure ESP-IDF builds (`PSYCHIC_ARDUINO=OFF`, the default) no longer pull in `arduino-esp32`. `esp_http_server` and `mbedtls` added as explicit deps in both branches.
 - `httpd` task stack size increased from 4608 to 5120 bytes. `std::string` method frames are slightly larger than Arduino `String` due to libstdc++ EH cleanup stubs, which pushed deep call chains (upload handler + middleware + digest auth) over the 4608 limit. Confirmed crash at 4608, stable at 4800; 5120 gives a ~512 byte margin. Total cost: +3.5 KB across 7 open sockets.
 
 ---

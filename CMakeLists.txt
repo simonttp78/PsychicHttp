@@ -6,11 +6,26 @@ set(COMPONENT_ADD_INCLUDEDIRS
     "src"
 )
 
-set(COMPONENT_REQUIRES
-    "arduino-esp32"
-    "esp_https_server"
-    "arduinojson"
-)
+# Set PSYCHIC_ARDUINO=ON when building with the arduino-esp32 component.
+# For pure ESP-IDF builds (no Arduino framework), leave it OFF (the default).
+option(PSYCHIC_ARDUINO "Build with Arduino framework support" OFF)
+
+if(PSYCHIC_ARDUINO)
+    set(COMPONENT_REQUIRES
+        "arduino-esp32"
+        "esp_https_server"
+        "esp_http_server"
+        "mbedtls"
+        "arduinojson"
+    )
+else()
+    set(COMPONENT_REQUIRES
+        "esp_https_server"
+        "esp_http_server"
+        "mbedtls"
+        "arduinojson"
+    )
+endif()
 
 register_component()
 
