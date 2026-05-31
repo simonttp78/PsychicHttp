@@ -1,0 +1,3 @@
+{
+    "python.defaultInterpreterPath": "${userHome}/.platformio/penv/bin/python3"
+}

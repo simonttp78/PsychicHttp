@@ -11,7 +11,6 @@ _secret.h
 .vscode/c_cpp_properties.json
 .vscode/ipch
 .vscode/launch.json
-.vscode/settings.json
 *.a
 *.app
 *.dll
@@ -34,7 +33,6 @@ _secret.h
 *.suo
 **.DS_Store
 **.pio
-**.vscode
 /build
 /psychic-http-loadtest.log
 /psychic-websocket-loadtest.log
