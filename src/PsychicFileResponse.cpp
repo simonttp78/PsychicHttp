@@ -2,6 +2,7 @@
 #include "PsychicRequest.h"
 #include "PsychicResponse.h"
 #include <http_status.h>
+#include <sys/stat.h>
 
 static inline bool endsWith(const char* str, const char* suffix)
 {
@@ -41,6 +42,40 @@ void PsychicFileResponse::_initFromFS(psychic::FS fs, const char* path, const ch
 PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, const char* path, const char* contentType, bool download)
     : PsychicResponseDelegate(response)
 {
+#ifdef ARDUINO
+  std::string spath(path);
+  struct stat st;
+
+  if (!download && stat(spath.c_str(), &st) != 0) {
+    std::string gzPath = spath + ".gz";
+    if (stat(gzPath.c_str(), &st) == 0) {
+      spath = gzPath;
+      addHeader("Content-Encoding", "gzip");
+    }
+  }
+
+  if (stat(spath.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+    _rawContent = fopen(spath.c_str(), "rb");
+    if (_rawContent != nullptr) {
+      setContentLength((size_t)st.st_size);
+
+      if (!contentType || !*contentType)
+        _setContentTypeFromPath(path);
+      else
+        setContentType(contentType);
+
+      const char* lastSlash = strrchr(path, '/');
+      const char* filename = lastSlash ? lastSlash + 1 : path;
+      std::string disposition = download ? "attachment" : "inline";
+      disposition += "; filename=\"";
+      disposition += filename;
+      disposition += "\"";
+      addHeader("Content-Disposition", disposition.c_str());
+      return;
+    }
+  }
+#endif
+
   _initFromFS(psychic::FS{}, path, contentType, download);
 }
 
@@ -86,6 +121,9 @@ PsychicFileResponse::PsychicFileResponse(PsychicResponse* response, fs::File con
 
 PsychicFileResponse::~PsychicFileResponse()
 {
+  if (_rawContent != nullptr)
+    fclose(_rawContent);
+
   if (_content)
     _content.close();
 }
@@ -139,8 +177,10 @@ void PsychicFileResponse::_setContentTypeFromPath(const char* p)
 esp_err_t PsychicFileResponse::send()
 {
   esp_err_t err = ESP_OK;
+  bool hasRawContent = (_rawContent != nullptr);
+  bool hasFsContent = static_cast<bool>(_content);
 
-  if (!_content) {
+  if (!hasRawContent && !hasFsContent) {
     httpd_resp_send_err(request(), HTTPD_404_NOT_FOUND, "File not found.");
     return ESP_FAIL;
   }
@@ -160,7 +200,11 @@ esp_err_t PsychicFileResponse::send()
       return ESP_FAIL;
     }
 
-    size_t readSize = _content.readBytes((char*)buffer, size);
+    size_t readSize = 0;
+    if (hasRawContent)
+      readSize = fread(buffer, 1, size, _rawContent);
+    else
+      readSize = _content.readBytes((char*)buffer, size);
 
     setContent(buffer, readSize);
     err = _response->send();
@@ -181,7 +225,11 @@ esp_err_t PsychicFileResponse::send()
     size_t chunksize;
     do {
       /* Read file in chunks into the scratch buffer */
-      chunksize = _content.readBytes(chunk, FILE_CHUNK_SIZE);
+      if (hasRawContent)
+        chunksize = fread(chunk, 1, FILE_CHUNK_SIZE, _rawContent);
+      else
+        chunksize = _content.readBytes(chunk, FILE_CHUNK_SIZE);
+
       if (chunksize > 0) {
         err = sendChunk((uint8_t*)chunk, chunksize);
         if (err != ESP_OK)

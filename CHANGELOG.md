@@ -18,6 +18,8 @@
 
 - `PsychicResponse`: chunked responses emitted the HTTP status `"0 unknown"` instead of `"200 OK"`. `_code` defaulted to 0, but the chunked send path (`PsychicFileResponse`, `PsychicStreamResponse`, `PsychicJson`) calls `sendHeaders()` directly, bypassing the `if (!_code) setCode(200)` fallback that only lives in `send()`. The constructor default was restored to 200 (regression from prior versions). (#248)
 - `PsychicStaticFileHandler::_getFile()`: strip query strings and URL-decode the request path. The handler previously used the raw URI tail verbatim, so requests with a query string (e.g. `"app.css?v=2"`) or percent-encoded names (e.g. `"my%20file.txt"`) failed to resolve. It now drops everything after the first `'?'` and URL-decodes via the existing `urlDecode` helper, with the traversal check moved after decoding so encoded sequences like `"%2e%2e"` can't slip past. (#249)
+- `PsychicResponse`: hardened body send path against null pointers. `setContent(const char*)` and `setContent(const uint8_t*, size_t)` now normalize null/empty inputs to an empty body with length 0, and `send()` now guards `null + len>0` as a controlled `ESP_FAIL` instead of passing an invalid pointer to `httpd_resp_send`.
+- `PsychicFileResponse`: fixed path-based Arduino/VFS download flow and send stability. The path constructor now supports direct VFS open via `stat`/`fopen` with fallback to the existing FS wrapper path, and `send()` now handles both FS and raw `FILE*` sources, including safe handling for unopened files (404/`ESP_FAIL`) and empty files (200 with empty body).
 
 ---
 

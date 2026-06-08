@@ -4,6 +4,7 @@
 #include "PsychicCore.h"
 #include "PsychicFS.h"
 #include "PsychicResponse.h"
+#include <stdio.h>
 
 class PsychicRequest;
 
@@ -15,6 +16,7 @@ class PsychicFileResponse : public PsychicResponseDelegate
 
   protected:
     psychic::File _content;
+    FILE* _rawContent = nullptr;
 
   public:
     PsychicFileResponse(PsychicResponse* response, const char* path,
