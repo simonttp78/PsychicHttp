@@ -80,13 +80,25 @@ void PsychicResponse::setContentType(const char* contentType)
 
 void PsychicResponse::setContent(const char* content)
 {
+  if (content == nullptr) {
+    _body = "";
+    setContentLength(0);
+    return;
+  }
+
   _body = content;
   setContentLength(strlen(content));
 }
 
 void PsychicResponse::setContent(const uint8_t* content, size_t len)
 {
-  _body = (char*)content;
+  if (content == nullptr || len == 0) {
+    _body = "";
+    setContentLength(0);
+    return;
+  }
+
+  _body = (const char*)content;
   setContentLength(len);
 }
 
@@ -104,11 +116,23 @@ esp_err_t PsychicResponse::send()
 {
   if (!_code)
     setCode(200);
+
+  const char* body = getContent();
+  size_t len = getContentLength();
+  if (body == nullptr) {
+    if (len == 0)
+      body = "";
+    else {
+      ESP_LOGE(PH_TAG, "Invalid response body: null body with non-zero length (%zu)", len);
+      return ESP_FAIL;
+    }
+  }
+
   // our headers too
   this->sendHeaders();
 
   // now send it off
-  esp_err_t err = httpd_resp_send(_request->request(), getContent(), getContentLength());
+  esp_err_t err = httpd_resp_send(_request->request(), body, len);
 
   // did something happen?
   if (err != ESP_OK)

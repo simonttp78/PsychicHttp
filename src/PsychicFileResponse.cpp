@@ -140,9 +140,19 @@ esp_err_t PsychicFileResponse::send()
 {
   esp_err_t err = ESP_OK;
 
+  if (!_content) {
+    httpd_resp_send_err(request(), HTTPD_404_NOT_FOUND, "File not found.");
+    return ESP_FAIL;
+  }
+
   // just send small files directly
   size_t size = getContentLength();
   if (size < FILE_CHUNK_SIZE) {
+    if (size == 0) {
+      setContent((const uint8_t*)"", 0);
+      return _response->send();
+    }
+
     uint8_t* buffer = (uint8_t*)malloc(size);
     if (buffer == NULL && size > 0) {
       ESP_LOGE(PH_TAG, "Unable to allocate %zu bytes to send chunk", size);
