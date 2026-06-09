@@ -34,7 +34,13 @@ MultipartProcessor::MultipartProcessor(PsychicRequest* request, PsychicUploadCal
                                                                                                         _itemIsFile(false)
 {
 }
-MultipartProcessor::~MultipartProcessor() {}
+MultipartProcessor::~MultipartProcessor()
+{
+  if (_itemBuffer != NULL) {
+    free(_itemBuffer);
+    _itemBuffer = NULL;
+  }
+}
 
 esp_err_t MultipartProcessor::process()
 {
@@ -54,7 +60,22 @@ esp_err_t MultipartProcessor::process()
     return ESP_ERR_HTTPD_INVALID_REQ;
   }
 
+  // Pre-allocate _itemBuffer before buf so that both FILE_CHUNK_SIZE blocks
+  // are grabbed while the heap is contiguous, before recv buffering begins.
+  _itemBuffer = (uint8_t*)malloc(FILE_CHUNK_SIZE);
+  if (_itemBuffer == NULL) {
+    ESP_LOGE(PH_TAG, "Multipart: Failed to pre-allocate item buffer");
+    return ESP_FAIL;
+  }
+  _itemBufferIndex = 0;
+
   char* buf = (char*)malloc(FILE_CHUNK_SIZE);
+  if (buf == NULL) {
+    free(_itemBuffer);
+    _itemBuffer = NULL;
+    ESP_LOGE(PH_TAG, "Multipart: Failed to allocate recv buffer");
+    return ESP_FAIL;
+  }
   int received;
   unsigned long index = 0;
 
@@ -229,13 +250,16 @@ void MultipartProcessor::_parseMultipartPostByte(uint8_t data, bool last)
         _itemStartIndex = _parsedLength;
         _itemValue.clear();
         if (_itemIsFile) {
-          if (_itemBuffer)
-            free(_itemBuffer);
-          _itemBuffer = (uint8_t*)malloc(FILE_CHUNK_SIZE);
+          // Reuse the buffer pre-allocated in process(). If _itemBuffer is
+          // NULL (e.g. called via process(const char*) overload, or after a
+          // previous file part was freed), fall back to malloc as before.
           if (_itemBuffer == NULL) {
-            ESP_LOGE(PH_TAG, "Multipart: Failed to allocate buffer");
-            _multiParseState = PARSE_ERROR;
-            return;
+            _itemBuffer = (uint8_t*)malloc(FILE_CHUNK_SIZE);
+            if (_itemBuffer == NULL) {
+              ESP_LOGE(PH_TAG, "Multipart: Failed to allocate buffer");
+              _multiParseState = PARSE_ERROR;
+              return;
+            }
           }
           _itemBufferIndex = 0;
         }

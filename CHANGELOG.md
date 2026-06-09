@@ -2,6 +2,7 @@
 
 ### Bug Fixes
 
+- `MultipartProcessor`: fixed allocation failure on low-heap targets (e.g. ESP32 with ~300 KB RAM). `process()` now pre-allocates `_itemBuffer` before the receive buffer so both 8 KB blocks are grabbed while the heap is still contiguous; `_parseMultipartPostByte()` reuses the pre-allocated buffer instead of free+malloc mid-parse, falling back to `malloc` only for the `process(const char*)` overload and subsequent file parts. The destructor now also frees `_itemBuffer` if the object is destroyed after an early-exit allocation failure, closing a pre-existing leak.
 - `PsychicResponse`: hardened body send path against null pointers. `setContent(const char*)` and `setContent(const uint8_t*, size_t)` now normalize null/empty inputs to an empty body with length 0, and `send()` now guards `null + len>0` as a controlled `ESP_FAIL` instead of passing an invalid pointer to `httpd_resp_send`.
 - `PsychicFileResponse`: fixed path-based Arduino/VFS download flow and send stability. The path constructor now supports direct VFS open via `stat`/`fopen` with fallback to the existing FS wrapper path, and `send()` now handles both FS and raw `FILE*` sources, including safe handling for unopened files (404/`ESP_FAIL`) and empty files (200 with empty body).
 
